@@ -4,6 +4,7 @@ import json
 import gspread
 from google.oauth2.service_account import Credentials
 from nickdate_test import extract_nickdate
+from concurrent.futures import ThreadPoolExecutor
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets"
@@ -58,8 +59,13 @@ print("크롤링 대상 개수 :", len(requests))
 for row, url in zip(target_rows, requests):
     print(row, url)
 
+with ThreadPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(extract_nickdate, requests))
+    
+print(f"결과 개수: {len(results)}")   # 추가
 
-
-worksheet.update_acell("A1", "GitHub Actions 성공!")
+for row, result in zip(target_rows, results):
+    print(row, result)
 
 print("완료")
+
