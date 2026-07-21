@@ -27,10 +27,17 @@ worksheet = spreadsheet.sheet1
 
 start_row = 5
 
-urls = worksheet.col_values(3)      # C열
-dates = worksheet.col_values(5)     # E열
-authors = worksheet.col_values(6)   # F열
+urls = worksheet.col_values(3)
+dates = worksheet.col_values(5)
+authors = worksheet.col_values(6)
 
+# urls 길이에 맞게 부족한 부분 채우기
+while len(dates) < len(urls):
+    dates.append("")
+
+while len(authors) < len(urls):
+    authors.append("")
+    
 requests = []
 target_rows = []
 
