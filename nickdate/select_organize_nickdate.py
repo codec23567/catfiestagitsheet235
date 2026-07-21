@@ -98,7 +98,7 @@ while pending_requests and current_try < MAX_RETRIES:
     print(f"\n===== {current_try + 1}차 시도 =====")
 
     # 병렬 크롤링
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=12) as executor:
         results = list(executor.map(extract_nickdate, pending_requests))
 
     # 다음 재시도 대상
