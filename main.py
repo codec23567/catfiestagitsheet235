@@ -66,20 +66,52 @@ print("크롤링 대상 개수 :", len(requests))
 for row, url in zip(target_rows, requests):
     print(row, url)
 
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(extract_nickdate, requests))
-    
-print(f"결과 개수: {len(results)}")   # 추가
 
-for row, result in zip(target_rows, results):
+MAX_RETRIES = 3
+current_try = 0
 
-    if result["deleted"]:
-        dates[row - 1] = "삭제됨"
-        authors[row - 1] = ""
+pending_requests = requests[:]
+pending_rows = target_rows[:]
 
-    elif result["date"] and result["author"]:
-        dates[row - 1] = result["date"]
-        authors[row - 1] = result["author"]
+while pending_requests and current_try < MAX_RETRIES:
+
+    print(f"\n===== {current_try + 1}차 시도 =====")
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(extract_nickdate, pending_requests))
+
+    next_pending_requests = []
+    next_pending_rows = []
+
+    for row, url, result in zip(pending_rows, pending_requests, results):
+
+        if result["deleted"]:
+            dates[row - 1] = "삭제됨"
+            authors[row - 1] = ""
+            continue
+
+        if result["date"] and result["author"]:
+            dates[row - 1] = result["date"]
+            authors[row - 1] = result["author"]
+            continue
+
+        print(f"재시도 대상 : {url}")
+
+        next_pending_requests.append(url)
+        next_pending_rows.append(row)
+
+    pending_requests = next_pending_requests
+    pending_rows = next_pending_rows
+
+    current_try += 1
+
+
+
+
+for row in pending_rows:
+    dates[row - 1] = "retry"
+    authors[row - 1] = ""
+
 
 date_values = [[d] for d in dates[start_row - 1:]]
 author_values = [[a] for a in authors[start_row - 1:]]
