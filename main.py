@@ -3,6 +3,7 @@ import json
 
 import gspread
 from google.oauth2.service_account import Credentials
+from nickdate_test import extract_nickdate
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets"
@@ -31,6 +32,11 @@ for row, url in enumerate(urls[start_row - 1:], start=start_row):
         continue
 
     print(row, url)
+    result = extract_nickdate(url)
+
+    print(result)
+
+    break
 
 
 worksheet.update_acell("A1", "GitHub Actions 성공!")
