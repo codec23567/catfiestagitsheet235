@@ -21,6 +21,18 @@ spreadsheet = gc.open_by_key(
 
 worksheet = spreadsheet.sheet1
 
+start_row = 5
+
+urls = worksheet.col_values(3)   # C열
+
+for row, url in enumerate(urls[start_row - 1:], start=start_row):
+
+    if url.strip() == "":
+        continue
+
+    print(row, url)
+
+
 worksheet.update_acell("A1", "GitHub Actions 성공!")
 
 print("완료")
