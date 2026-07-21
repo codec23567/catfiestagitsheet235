@@ -21,6 +21,6 @@ spreadsheet = gc.open_by_key(
 
 worksheet = spreadsheet.sheet1
 
-worksheet.update("A1", "GitHub Actions 성공!")
+worksheet.update_acell("A1", "GitHub Actions 성공!")
 
 print("완료")
