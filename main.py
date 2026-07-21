@@ -65,7 +65,29 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 print(f"결과 개수: {len(results)}")   # 추가
 
 for row, result in zip(target_rows, results):
-    print(row, result)
+
+    if result["deleted"]:
+        dates[row - 1] = "삭제됨"
+        authors[row - 1] = ""
+
+    elif result["date"] and result["author"]:
+        dates[row - 1] = result["date"]
+        authors[row - 1] = result["author"]
+
+date_values = [[d] for d in dates[start_row - 1:]]
+author_values = [[a] for a in authors[start_row - 1:]]
+
+worksheet.update(
+    range_name=f"E{start_row}:E{start_row + len(date_values) - 1}",
+    values=date_values
+)
+
+worksheet.update(
+    range_name=f"F{start_row}:F{start_row + len(author_values) - 1}",
+    values=author_values
+)
+
+
 
 print("완료")
 
