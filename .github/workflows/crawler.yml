@@ -22,4 +22,4 @@ jobs:
       - name: Run Python
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-        run: python main.py
+        run: python nickdate/select_organize_nickdate.py
