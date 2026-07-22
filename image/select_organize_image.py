@@ -127,6 +127,10 @@ while len(k_values) < num_rows:
 while len(j_values) < num_rows:
     j_values.append([""])
 
+# J열의 빈 행([])을 [""]로 보정
+for i in range(num_rows):
+    if len(j_values[i]) == 0:
+        j_values[i] = [""]
 
 # -------------------------------------------------
 # 기존 validBCount 매칭
