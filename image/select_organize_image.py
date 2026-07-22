@@ -1,108 +1,171 @@
-/*
-[이미지 HTML 추출 및 자동 매칭 엔진 - 멀티 링크 지원]
-*/
-function runImageExtractor(sheet) {
-  // K3부터 가로로 10칸(K열~T열)의 링크 영역을 한 번에 읽어옵니다.
-  var row3Values = sheet.getRange(3, 11, 1, 10).getValues()[0];
-  var imgList = [];
+import os
+import json
 
-  // 가로로 적힌 링크들을 순서대로 돌면서 이미지를 하나의 바구니에 모읍니다.
-  for (var u = 0; u < row3Values.length; u++) {
-    var url = row3Values[u].toString().trim();
+import gspread
+from google.oauth2.service_account import Credentials
+from concurrent.futures import ThreadPoolExecutor
 
-    if (url && url.indexOf("dcinside") !== -1) {
+from image_test import extract_images
 
-      /*
-       디시 본문 이미지 태그 파싱 내부 엔진 (Vultr 서버 사용)
-      */
-      var subList = [];
 
-      try {
+# Google Sheets API 권한
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets"
+]
 
-        var payload = {
-          url: url
-        };
+# GitHub Secret 인증
+credentials = Credentials.from_service_account_info(
+    json.loads(os.environ["GOOGLE_CREDENTIALS"]),
+    scopes=SCOPES
+)
 
-        var options = {
-          method: "post",
-          contentType: "application/json",
-          payload: JSON.stringify(payload),
-          muteHttpExceptions: true
-        };
+gc = gspread.authorize(credentials)
 
-        var response = UrlFetchApp.fetch(
-          "http://64.176.232.213:5000/extract",
-          options
-        );
+# 스프레드시트 열기
+spreadsheet = gc.open_by_key(
+    "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
+)
 
-        var result = JSON.parse(response.getContentText());
+worksheet = spreadsheet.sheet1
 
-        if (result.success && result.images && result.images.length > 0) {
-          subList = result.images;
-        } else {
-          subList = ["본문 이미지 없음"];
-        }
 
-      } catch (e) {
+# -------------------------------------------------
+# K3:T3 링크 읽기
+# -------------------------------------------------
 
-        subList = ["연결 실패 : " + e.toString()];
+row3 = worksheet.row_values(3)
 
-      }
+requests = []
 
-      if (subList.length > 0 && subList[0].indexOf("<img") !== -1) {
-        imgList = imgList.concat(subList);
-      }
-    }
-  }
+# K열(11) ~ T열(20)
+for col in range(11, 21):
 
-  // 만약 모든 링크를 다 뒤졌는데도 이미지가 단 하나도 없다면 예외 처리
-  if (imgList.length === 0) {
-    imgList = ["본문 이미지 없음"];
-  }
+    index = col - 1
 
-  var imgCnt = imgList.length;
+    if index >= len(row3):
+        continue
 
-  var startRow = 5;
-  var lastRow = sheet.getLastRow();
-  if (lastRow < startRow) lastRow = startRow;
+    url = row3[index].strip()
 
-  var numRows = lastRow - startRow + 1;
+    if not url:
+        continue
 
-  var bValues = sheet.getRange(startRow, 2, numRows, 1).getValues();   // B열
-  var kValues = sheet.getRange(startRow, 11, numRows, 1).getValues();  // K열
+    if "dcinside" not in url:
+        continue
 
-  // 결과 HTML이 출력될 열 번호 (J열)
-  var targetColumn = 10;
-  var outputValues = sheet.getRange(startRow, targetColumn, numRows, 1).getValues();
+    requests.append(url)
 
-  // 기존 매칭 로직 그대로
-  var validBCount = 0;
+print("이미지 추출 대상 :", len(requests))
 
-  for (var i = 0; i < numRows; i++) {
+for url in requests:
+    print(url)
 
-    var bCell = bValues[i][0];
-    var kCell = kValues[i][0];
 
-    if (bCell && bCell.toString().trim() !== "") {
+# -------------------------------------------------
+# 병렬 이미지 추출
+# -------------------------------------------------
 
-      validBCount++;
+img_list = []
 
-      if (kCell && kCell.toString().trim() !== "" && validBCount <= imgCnt) {
-        outputValues[i][0] = imgList[validBCount - 1];
-      }
-      else if (kCell && kCell.toString().trim() !== "") {
-        outputValues[i][0] = "";
-      }
+if requests:
 
-    } else {
+    with ThreadPoolExecutor(max_workers=10) as executor:
 
-      if (kCell && kCell.toString().trim() !== "") {
-        outputValues[i][0] = "";
-      }
+        results = list(
+            executor.map(
+                extract_images,
+                requests
+            )
+        )
 
-    }
+    for images in results:
 
-  }
+        if images:
+            img_list.extend(images)
 
-  sheet.getRange(startRow, targetColumn, numRows, 1).setValues(outputValues);
-}
+
+# 기존 Apps Script와 동일한 처리
+
+if len(img_list) == 0:
+    img_list = ["본문 이미지 없음"]
+
+
+# -------------------------------------------------
+# B/K 읽기
+# -------------------------------------------------
+
+start_row = 5
+
+last_row = len(worksheet.col_values(2))
+
+if last_row < start_row:
+    last_row = start_row
+
+num_rows = last_row - start_row + 1
+
+b_values = worksheet.get(
+    f"B{start_row}:B{last_row}"
+)
+
+k_values = worksheet.get(
+    f"K{start_row}:K{last_row}"
+)
+
+j_values = worksheet.get(
+    f"J{start_row}:J{last_row}"
+)
+
+
+# 길이 보정
+
+while len(b_values) < num_rows:
+    b_values.append([""])
+
+while len(k_values) < num_rows:
+    k_values.append([""])
+
+while len(j_values) < num_rows:
+    j_values.append([""])
+
+
+# -------------------------------------------------
+# 기존 validBCount 매칭
+# -------------------------------------------------
+
+valid_b_count = 0
+
+for i in range(num_rows):
+
+    b = b_values[i][0] if b_values[i] else ""
+    k = k_values[i][0] if k_values[i] else ""
+
+    if b and str(b).strip():
+
+        valid_b_count += 1
+
+        if k and str(k).strip():
+
+            if valid_b_count <= len(img_list):
+
+                j_values[i][0] = img_list[valid_b_count - 1]
+
+            else:
+
+                j_values[i][0] = ""
+
+    else:
+
+        if k and str(k).strip():
+            j_values[i][0] = ""
+
+
+# -------------------------------------------------
+# Google Sheets 저장
+# -------------------------------------------------
+
+worksheet.update(
+    range_name=f"J{start_row}:J{last_row}",
+    values=j_values
+)
+
+print("완료")
