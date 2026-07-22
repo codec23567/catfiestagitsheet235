@@ -1,0 +1,41 @@
+name: Modify HTML
+
+on:
+  workflow_dispatch:
+    inputs:
+      sheet_name:
+        description: "Target sheet"
+        required: true
+        type: string
+
+jobs:
+  modify-html:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Google Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Install ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium gspread google-auth
+
+      - name: Run Modify HTML
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
+          CAT_ID: ${{ secrets.CAT_ID }}
+          CAT_PW: ${{ secrets.CAT_PW }}
+        run: python modify_html_ver/read_host_html.py
