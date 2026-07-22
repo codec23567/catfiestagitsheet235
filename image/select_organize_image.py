@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from concurrent.futures import ThreadPoolExecutor
 
-from image_test import extract_images
+from regex_test import extract_images
 
 
 # Google Sheets API 권한
