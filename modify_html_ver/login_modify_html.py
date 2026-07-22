@@ -140,6 +140,8 @@ def modify_post(
 
     except Exception as e:
 
+        traceback.print_exc()
+
         return {
             "success": False,
             "message": str(e)
