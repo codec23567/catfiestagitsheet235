@@ -2,6 +2,11 @@ name: Image Crawler
 
 on:
   workflow_dispatch:
+    inputs:
+      sheet_name:
+        description: "Target sheet"
+        required: true
+        type: string
 
 jobs:
   image:
@@ -22,4 +27,5 @@ jobs:
       - name: Run Python
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
         run: python image/select_organize_image.py
