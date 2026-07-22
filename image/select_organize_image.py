@@ -26,7 +26,9 @@ spreadsheet = gc.open_by_key(
     "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
 )
 
-worksheet = spreadsheet.sheet1
+worksheet = spreadsheet.worksheet(
+    os.environ["TARGET_SHEET"]
+)
 
 
 # -------------------------------------------------
