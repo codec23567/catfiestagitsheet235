@@ -21,9 +21,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Google Chrome
-        uses: browser-actions/setup-chrome@v1
-
       - name: Install ChromeDriver
         uses: nanasess/setup-chromedriver@v2
 
