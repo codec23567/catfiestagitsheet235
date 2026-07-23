@@ -22,6 +22,9 @@ def modify_post(
 ):
     print("★★★★★ modify_post 시작 ★★★★★", flush=True)
     start = time.perf_counter()
+
+    t = time.perf_counter()
+
     options = Options()
 
     options.binary_location = "/usr/bin/google-chrome"
@@ -31,6 +34,22 @@ def modify_post(
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
 
+    # Chrome 최적화
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-sync")
+    options.add_argument("--metrics-recording-only")
+    options.add_argument("--disable-default-apps")
+
+    # 이미지 로딩 차단
+    options.add_experimental_option(
+        "prefs",
+        {
+            "profile.managed_default_content_settings.images": 2
+        }
+    )
+
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -38,7 +57,8 @@ def modify_post(
     )
 
     driver = webdriver.Chrome(options=options)
-    wait = WebDriverWait(driver, 10)
+
+    wait = WebDriverWait(driver, 5)
 
     try:
 
@@ -52,15 +72,16 @@ def modify_post(
             EC.visibility_of_element_located(
                 (By.NAME, "user_id")
             )
-        )      
+        )
 
         id_input.clear()
         id_input.send_keys(user_id)
+
         pw_input = wait.until(
             EC.visibility_of_element_located(
                 (By.NAME, "pw")
             )
-        )        
+        )
 
         pw_input.clear()
         pw_input.send_keys(user_pw)
@@ -69,7 +90,7 @@ def modify_post(
             EC.element_to_be_clickable(
                 (By.CSS_SELECTOR, "button[type='submit']")
             )
-        )        
+        )
 
         login_button.click()
 
@@ -77,13 +98,15 @@ def modify_post(
             EC.url_changes(LOGIN_URL)
         )
 
+        print(f"[시간] 로그인 : {time.perf_counter()-t:.2f}초", flush=True)
+        t = time.perf_counter()
+
         # ============================================
         # 수정 페이지 이동
         # ============================================
 
         driver.get(modify_url)
 
-    
         # ============================================
         # HTML 모드
         # ============================================
@@ -97,10 +120,10 @@ def modify_post(
             )
         )
 
+        print(f"[시간] 수정페이지 : {time.perf_counter()-t:.2f}초", flush=True)
+        t = time.perf_counter()
+
         html_button.click()
-
-        
-
 
         # ============================================
         # 본문 교체
@@ -113,11 +136,13 @@ def modify_post(
                     ".note-codable"
                 )
             )
-        )        
+        )
 
         html_area.clear()
         html_area.send_keys(html)
 
+        print(f"[시간] 본문입력 : {time.perf_counter()-t:.2f}초", flush=True)
+        t = time.perf_counter()
 
         # ============================================
         # 수정 버튼
@@ -125,18 +150,20 @@ def modify_post(
 
         write_button = wait.until(
             EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, "button.btn_blue.write")
+                (
+                    By.CSS_SELECTOR,
+                    "button.btn_blue.write"
+                )
             )
-        )        
+        )
 
         write_button.click()
 
-        
+        print(f"[시간] 저장 : {time.perf_counter()-t:.2f}초", flush=True)
 
         return {
             "success": True
         }
-
 
     except Exception as e:
 
@@ -147,8 +174,12 @@ def modify_post(
             "message": str(e)
         }
 
-
     finally:
+
         elapsed = time.perf_counter() - start
-        print(f"[modify_post] 실행시간: {elapsed:.2f}초")
+
+        print(
+            f"[modify_post] 실행시간: {elapsed:.2f}초"
+        )
+
         driver.quit()
