@@ -31,22 +31,33 @@ jobs:
           pip install selenium gspread google-auth
 
       - name: Generate Matrix
-        id: matrix
-        shell: bash
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
         run: |
-          MATRIX=$(python modify_normal_bl_ver/factory_host.py)
+          python modify_normal_bl_ver/factory_host.py
 
-          echo "Factory output:"
-          echo "$MATRIX"
 
-          {
-            echo "matrix<<EOF"
-            echo "$MATRIX"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+
+      # - name: Generate Matrix
+      #   id: matrix
+      #   shell: bash
+      #   env:
+      #     GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+      #     TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
+      #   run: |
+      #     MATRIX=$(python modify_normal_bl_ver/factory_host.py)
+
+      #     echo "Factory output:"
+      #     echo "$MATRIX"
+
+      #     {
+      #       echo "matrix<<EOF"
+      #       echo "$MATRIX"
+      #       echo "EOF"
+      #     } >> "$GITHUB_OUTPUT"
+
+
 
   modify-normal:
     needs: create-matrix
