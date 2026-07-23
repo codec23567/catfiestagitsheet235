@@ -60,6 +60,7 @@ user_id = os.environ["CAT_ID"]
 user_pw = os.environ["CAT_PW"]
 
 row = int(os.environ["ROW"])
+result_row = row + 1
 
 
 # -------------------------------------------------
@@ -73,11 +74,14 @@ text = (
 ).replace("§", "\n\n")
 
 
+# -------------------------------------------------
 # URL이 없으면 종료
+# -------------------------------------------------
 
 if not modify_url:
+
     worksheet.update(
-        range_name=f"I{row}",
+        range_name=f"G{result_row}",
         values=[["URL 없음"]]
     )
 
@@ -95,7 +99,7 @@ try:
 except Exception as e:
 
     worksheet.update(
-        range_name=f"I{row}",
+        range_name=f"G{result_row}",
         values=[[f"URL 오류 : {e}"]]
     )
 
@@ -122,7 +126,7 @@ result = modify_post(
 if result["success"]:
 
     worksheet.update(
-        range_name=f"I{row}",
+        range_name=f"G{result_row}",
         values=[["완료"]]
     )
 
@@ -133,7 +137,7 @@ else:
     message = result.get("message", "알 수 없는 오류")
 
     worksheet.update(
-        range_name=f"I{row}",
+        range_name=f"G{result_row}",
         values=[[f"실패 : {message}"]]
     )
 
