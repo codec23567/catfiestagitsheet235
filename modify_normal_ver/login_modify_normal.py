@@ -34,6 +34,14 @@ def modify_post(
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
 
+    # Chrome 최적화
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-sync")
+    options.add_argument("--metrics-recording-only")
+    options.add_argument("--disable-default-apps")
+
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -41,7 +49,9 @@ def modify_post(
     )
 
     driver = webdriver.Chrome(options=options)
-    wait = WebDriverWait(driver, 10)
+
+    wait = WebDriverWait(driver, 5)
+    short_wait = WebDriverWait(driver, 5)
 
     try:
 
@@ -86,8 +96,8 @@ def modify_post(
         # ============================================
 
         driver.get(modify_url)
-        
-        wait.until(
+
+        html_button = wait.until(
             EC.element_to_be_clickable(
                 (
                     By.XPATH,
@@ -99,15 +109,6 @@ def modify_post(
         # ============================================
         # HTML 모드
         # ============================================
-
-        html_button = wait.until(
-            EC.element_to_be_clickable(
-                (
-                    By.XPATH,
-                    "//button[normalize-space()='HTML']"
-                )
-            )
-        )
 
         html_button.click()
 
@@ -145,11 +146,6 @@ def modify_post(
 
         url_pattern = re.compile(r"^https?://\S+$")
 
-        has_url = any(
-            url_pattern.match(line.strip())
-            for line in text.splitlines()
-        )
-
         for line in text.splitlines():
 
             print(f"입력: [{line}]", flush=True)
@@ -164,7 +160,7 @@ def modify_post(
                     "oglink('paste', false, '');"
                 )
 
-                WebDriverWait(driver, 5).until(
+                short_wait.until(
                     EC.presence_of_element_located(
                         (
                             By.CSS_SELECTOR,
@@ -176,15 +172,6 @@ def modify_post(
                 print("OG 생성 완료", flush=True)
 
                 # HTML 모드
-                html_button = wait.until(
-                    EC.element_to_be_clickable(
-                        (
-                            By.XPATH,
-                            "//button[normalize-space()='HTML']"
-                        )
-                    )
-                )
-
                 html_button.click()
 
                 html_area = wait.until(
