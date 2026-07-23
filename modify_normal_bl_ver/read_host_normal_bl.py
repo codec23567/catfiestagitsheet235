@@ -38,24 +38,29 @@ worksheet = spreadsheet.worksheet(
 user_id = os.environ["CAT_ID"]
 user_pw = os.environ["CAT_PW"]
 
+row = int(os.environ["ROW"])
+
 
 # -------------------------------------------------
 # 시트 데이터 읽기
 # -------------------------------------------------
 
-modify_url = worksheet.acell("M3").value
+modify_url = (worksheet.acell(f"G{row}").value or "").strip()
 
-if modify_url:
-    modify_url = modify_url.strip()
-else:
-    modify_url = ""
-
-text = (worksheet.acell("M4").value or "").replace("§", "\n\n")
+text = (
+    worksheet.acell(f"H{row}").value or ""
+).replace("§", "\n\n")
 
 
 # URL이 없으면 종료
+
 if not modify_url:
-    print("수정 URL이 없습니다.")
+    worksheet.update(
+        range_name=f"I{row}",
+        values=[["URL 없음"]]
+    )
+
+    print(f"{row}행 : URL 없음")
     exit()
 
 
@@ -78,19 +83,19 @@ result = modify_post(
 if result["success"]:
 
     worksheet.update(
-        range_name="M7",
+        range_name=f"I{row}",
         values=[["완료"]]
     )
 
-    print("완료")
+    print(f"{row}행 완료")
 
 else:
 
     message = result.get("message", "알 수 없는 오류")
 
     worksheet.update(
-        range_name="M7",
+        range_name=f"I{row}",
         values=[[f"실패 : {message}"]]
     )
 
-    print(f"실패 : {message}")
+    print(f"{row}행 실패 : {message}")
