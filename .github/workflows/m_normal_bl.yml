@@ -16,9 +16,11 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
@@ -28,12 +30,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install selenium gspread google-auth
 
-      - id: matrix
+      - name: Generate Matrix
+        id: matrix
+        shell: bash
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
         run: |
-          echo "matrix=$(python modify_normal_bl_ver/factory_host.py)" >> $GITHUB_OUTPUT
+          MATRIX=$(python modify_normal_bl_ver/factory_host.py)
+
+          echo "Factory output:"
+          echo "$MATRIX"
+
+          {
+            echo "matrix<<EOF"
+            echo "$MATRIX"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
   modify-normal:
     needs: create-matrix
@@ -45,9 +58,11 @@ jobs:
       matrix: ${{ fromJson(needs.create-matrix.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
