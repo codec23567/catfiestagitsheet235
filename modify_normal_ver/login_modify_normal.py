@@ -86,8 +86,15 @@ def modify_post(
         # ============================================
 
         driver.get(modify_url)
-
-        time.sleep(2)
+        
+        wait.until(
+            EC.element_to_be_clickable(
+                (
+                    By.XPATH,
+                    "//button[normalize-space()='HTML']"
+                )
+            )
+        )
 
         # ============================================
         # HTML 모드
