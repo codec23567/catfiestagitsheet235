@@ -32,26 +32,25 @@ def extract_images(url):
         )
 
         html = response.text
+
+        # -------------------------
+        # write_div 영역만 추출
+        # -------------------------
+
         body_part = html
 
-        body_start = html.find('class="writing_view_box"')
-
-        if body_start == -1:
-            body_start = html.find('class="writeview_contents"')
-
-        if body_start == -1:
-            body_start = html.find('class="thum-txt"')
+        body_start = html.find('class="write_div"')
 
         if body_start != -1:
 
             body_end = html.find(
-                'class="comment_wrap"',
+                '<script id="mg_numbering-tmpl"',
                 body_start
             )
 
             if body_end == -1:
                 body_end = html.find(
-                    'class="view_comment"',
+                    '<script',
                     body_start
                 )
 
@@ -60,10 +59,14 @@ def extract_images(url):
             else:
                 body_part = html[body_start:]
 
+        # -------------------------
+        # 이미지 추출
+        # -------------------------
+
         regex_start = time.time()
 
         img_regex = re.compile(
-            r'<img[^>]*(?:src|data-src|data-original)=["\']([^"\']*viewimage\.php[^"\']*)["\'][^>]*',
+            r'<img[^>]*(?:src|data-src|data-original)=["\']([^"\']*viewimage\.php[^"\']*)["\']',
             re.IGNORECASE
         )
 
