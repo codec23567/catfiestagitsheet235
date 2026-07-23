@@ -30,4 +30,4 @@ jobs:
           TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
           CAT_ID: ${{ secrets.CAT_ID }}
           CAT_PW: ${{ secrets.CAT_PW }}
-        run: python modify_normal_ver/read_normal.py
+        run: python modify_normal_ver/read_host_normal.py
