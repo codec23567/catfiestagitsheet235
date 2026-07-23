@@ -50,7 +50,7 @@ if modify_url:
 else:
     modify_url = ""
 
-text = worksheet.acell("M4").value or ""
+text = (worksheet.acell("M4").value or "").replace("§", "\n\n")
 
 
 # URL이 없으면 종료
