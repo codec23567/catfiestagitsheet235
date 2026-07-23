@@ -9,64 +9,8 @@ on:
         type: string
 
 jobs:
-  create-matrix:
-    runs-on: ubuntu-latest
-
-    outputs:
-      matrix: ${{ steps.matrix.outputs.matrix }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install selenium gspread google-auth
-
-      - name: Generate Matrix
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
-        run: |
-          python modify_normal_bl_ver/factory_host.py
-
-
-
-      # - name: Generate Matrix
-      #   id: matrix
-      #   shell: bash
-      #   env:
-      #     GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-      #     TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
-      #   run: |
-      #     MATRIX=$(python modify_normal_bl_ver/factory_host.py)
-
-      #     echo "Factory output:"
-      #     echo "$MATRIX"
-
-      #     {
-      #       echo "matrix<<EOF"
-      #       echo "$MATRIX"
-      #       echo "EOF"
-      #     } >> "$GITHUB_OUTPUT"
-
-
-
   modify-normal:
-    needs: create-matrix
-
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.create-matrix.outputs.matrix) }}
 
     steps:
       - name: Checkout repository
@@ -76,19 +20,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install selenium gspread google-auth
 
-      - name: Run Modify Normal_bl
+      - name: Run Modify Normal
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
           CAT_ID: ${{ secrets.CAT_ID }}
           CAT_PW: ${{ secrets.CAT_PW }}
-          ROW: ${{ matrix.row }}
-        run: |
-          python modify_normal_bl_ver/read_host_normal_bl.py
+        run: python modify_normal_bl_ver/factory_host.py
