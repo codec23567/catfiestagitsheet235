@@ -25,6 +25,8 @@ def modify_post(
     print("★★★★★ modify_post 시작 ★★★★★", flush=True)
     start = time.perf_counter()
 
+    t = time.perf_counter()
+
     options = Options()
 
     options.binary_location = "/usr/bin/google-chrome"
@@ -55,7 +57,7 @@ def modify_post(
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/150.0.0.0 Safari/537.36"
     )
-  
+
     driver = webdriver.Chrome(options=options)
 
     wait = WebDriverWait(driver, 5)
@@ -99,6 +101,9 @@ def modify_post(
             EC.url_changes(LOGIN_URL)
         )
 
+        print(f"[시간] 로그인 : {time.perf_counter()-t:.2f}초", flush=True)
+        t = time.perf_counter()
+
         # ============================================
         # 수정 페이지 이동
         # ============================================
@@ -113,6 +118,9 @@ def modify_post(
                 )
             )
         )
+
+        print(f"[시간] 수정페이지 : {time.perf_counter()-t:.2f}초", flush=True)
+        t = time.perf_counter()
 
         # ============================================
         # HTML 모드
@@ -210,6 +218,9 @@ def modify_post(
 
             editor.send_keys(Keys.SHIFT, Keys.ENTER)
 
+        print(f"[시간] 본문입력 : {time.perf_counter()-t:.2f}초", flush=True)
+        t = time.perf_counter()
+
         # ============================================
         # 수정 버튼
         # ============================================
@@ -224,6 +235,8 @@ def modify_post(
         )
 
         write_button.click()
+
+        print(f"[시간] 저장 : {time.perf_counter()-t:.2f}초", flush=True)
 
         return {
             "success": True
