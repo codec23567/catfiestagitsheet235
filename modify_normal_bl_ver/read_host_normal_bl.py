@@ -4,7 +4,7 @@ import json
 import gspread
 from google.oauth2.service_account import Credentials
 
-from login_modify_normal import modify_post
+from login_modify_normal_bl import modify_post
 
 
 # -------------------------------------------------
