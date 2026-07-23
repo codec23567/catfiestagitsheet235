@@ -1,53 +1,96 @@
-/*
- 게시글 수정(일반에디터)
-*/
+import os
+import json
 
-function runModifyNormal(sheet) {
+import gspread
+from google.oauth2.service_account import Credentials
 
-  // 로그인 정보
-  var userId = "circus2354";
-  var userPw = "m0derni@2357";
+from login_modify_normal import modify_post
 
-  // 수정 페이지 링크(C3)
-  var modifyUrl = sheet.getRange("M3").getValue().toString().trim();
 
-  // 일반 에디터에 넣을 내용(I5)
-  var text = sheet.getRange("M4").getValue().toString();
+# -------------------------------------------------
+# Google Sheets 인증
+# -------------------------------------------------
 
-  // URL이 없으면 종료
-  if (!modifyUrl) return;
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets"
+]
 
-  var payload = {
-    id: userId,
-    pw: userPw,
-    url: modifyUrl,
-    text: text
-  };
+credentials = Credentials.from_service_account_info(
+    json.loads(os.environ["GOOGLE_CREDENTIALS"]),
+    scopes=SCOPES
+)
 
-  var options = {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
+gc = gspread.authorize(credentials)
 
-  var response = UrlFetchApp.fetch(
-    "http://64.176.232.213:5000/modify-normal",
-    options
-  );
+spreadsheet = gc.open_by_key(
+    "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
+)
 
-  var result = JSON.parse(response.getContentText());
+worksheet = spreadsheet.worksheet(
+    os.environ["TARGET_SHEET"]
+)
 
-  if (result.success) {
 
-    sheet.getRange("M7").setValue("완료");
+# -------------------------------------------------
+# GitHub Secrets
+# -------------------------------------------------
 
-  } else {
+user_id = os.environ["CAT_ID"]
+user_pw = os.environ["CAT_PW"]
 
-    sheet.getRange("M7").setValue(
-      "실패 : " + result.message
-    );
 
-  }
+# -------------------------------------------------
+# 시트 데이터 읽기
+# -------------------------------------------------
 
-}
+modify_url = worksheet.acell("M3").value
+
+if modify_url:
+    modify_url = modify_url.strip()
+else:
+    modify_url = ""
+
+text = worksheet.acell("M4").value or ""
+
+
+# URL이 없으면 종료
+if not modify_url:
+    print("수정 URL이 없습니다.")
+    exit()
+
+
+# -------------------------------------------------
+# 게시글 수정
+# -------------------------------------------------
+
+result = modify_post(
+    user_id,
+    user_pw,
+    modify_url,
+    text
+)
+
+
+# -------------------------------------------------
+# 결과 기록
+# -------------------------------------------------
+
+if result["success"]:
+
+    worksheet.update(
+        range_name="M7",
+        values=[["완료"]]
+    )
+
+    print("완료")
+
+else:
+
+    message = result.get("message", "알 수 없는 오류")
+
+    worksheet.update(
+        range_name="M7",
+        values=[[f"실패 : {message}"]]
+    )
+
+    print(f"실패 : {message}")
