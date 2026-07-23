@@ -29,8 +29,6 @@ def extract_nickdate(url):
         )
 
         # 삭제된 글 판정
-        # 정상 HTML에도 '삭제'라는 단어가 들어갈 수 있으므로
-        # 우선 HTTP 404만 삭제된 글로 판정
         deleted = response.status_code == 404
 
         if deleted:
@@ -43,15 +41,39 @@ def extract_nickdate(url):
         date = ""
         author = ""
 
+        # -------------------------
+        # gallview_head 영역만 추출
+        # -------------------------
+
+        head_part = html
+
+        head_start = html.find('<div class="gallview_head"')
+
+        if head_start != -1:
+
+            head_end = html.find(
+                '<div class="gallview_contents"',
+                head_start
+            )
+
+            if head_end != -1:
+                head_part = html[head_start:head_end]
+            else:
+                head_part = html[head_start:]
+
+        # -------------------------
         # 작성자 추출
+        # -------------------------
+
         author_match = re.search(
             r'data-nick="([^"]+)"'
             r'(?:\s+data-uid="([^"]*)")?'
             r'(?:\s+data-ip="([^"]*)")?',
-            html
+            head_part
         )
 
         if author_match:
+
             nick = html_module.unescape(
                 author_match.group(1)
             )
@@ -67,20 +89,24 @@ def extract_nickdate(url):
             else:
                 author = nick
 
+        # -------------------------
         # 날짜 추출
+        # -------------------------
+
         date_match = (
             re.search(
                 r'<span class="gall_date" title="([^"]+)">',
-                html
+                head_part
             )
             or
             re.search(
                 r'<span class="date">([^<]+)</span>',
-                html
+                head_part
             )
         )
 
         if date_match:
+
             raw_date = (
                 date_match.group(1)
                 .strip()
