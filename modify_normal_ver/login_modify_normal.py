@@ -16,15 +16,15 @@ LOGIN_URL = (
 )
 
 
-def modify_post_editor(
+def modify_post(
     user_id,
     user_pw,
     modify_url,
     text
 ):
-    
     print("★★★★★ modify_post 시작 ★★★★★", flush=True)
     start = time.perf_counter()
+
     options = Options()
 
     options.binary_location = "/usr/bin/google-chrome"
@@ -55,15 +55,16 @@ def modify_post_editor(
             EC.visibility_of_element_located(
                 (By.NAME, "user_id")
             )
-        )      
+        )
 
         id_input.clear()
         id_input.send_keys(user_id)
+
         pw_input = wait.until(
             EC.visibility_of_element_located(
                 (By.NAME, "pw")
             )
-        )        
+        )
 
         pw_input.clear()
         pw_input.send_keys(user_pw)
@@ -72,7 +73,7 @@ def modify_post_editor(
             EC.element_to_be_clickable(
                 (By.CSS_SELECTOR, "button[type='submit']")
             )
-        )        
+        )
 
         login_button.click()
 
@@ -86,12 +87,10 @@ def modify_post_editor(
 
         driver.get(modify_url)
 
-       # 페이지가 완전히 그려질 때까지 잠깐 대기
         time.sleep(2)
 
-
         # ============================================
-        # HTML 모드로 전환
+        # HTML 모드
         # ============================================
 
         html_button = wait.until(
@@ -106,7 +105,7 @@ def modify_post_editor(
         html_button.click()
 
         # ============================================
-        # HTML 내용 전체 삭제
+        # HTML 내용 삭제
         # ============================================
 
         html_area = wait.until(
@@ -121,13 +120,11 @@ def modify_post_editor(
         html_area.clear()
 
         # ============================================
-        # 다시 에디터 모드로 복귀
+        # 일반 에디터 모드
         # ============================================
-
 
         html_button.click()
 
-        # 에디터가 다시 활성화될 때까지 대기
         editor = wait.until(
             EC.visibility_of_element_located(
                 (
@@ -139,12 +136,12 @@ def modify_post_editor(
 
         editor.click()
 
-        url_pattern = re.compile(r'^https?://\S+$')
+        url_pattern = re.compile(r"^https?://\S+$")
 
         has_url = any(
             url_pattern.match(line.strip())
             for line in text.splitlines()
-        )        
+        )
 
         for line in text.splitlines():
 
@@ -152,26 +149,26 @@ def modify_post_editor(
 
             editor.send_keys(line)
 
-
             if url_pattern.match(line.strip()):
 
                 print("URL 발견", flush=True)
 
-                driver.execute_script("oglink('paste', false, '');")
+                driver.execute_script(
+                    "oglink('paste', false, '');"
+                )
 
-                time.sleep(2)
-
-                print(
-                    "현재 og-div:",
-                    len(driver.find_elements(By.CSS_SELECTOR, ".og-div")),
-                    flush=True
+                WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located(
+                        (
+                            By.CSS_SELECTOR,
+                            ".og-div"
+                        )
+                    )
                 )
 
                 print("OG 생성 완료", flush=True)
 
-                # -----------------------------
                 # HTML 모드
-                # -----------------------------
                 html_button = wait.until(
                     EC.element_to_be_clickable(
                         (
@@ -180,6 +177,7 @@ def modify_post_editor(
                         )
                     )
                 )
+
                 html_button.click()
 
                 html_area = wait.until(
@@ -194,9 +192,7 @@ def modify_post_editor(
                 # HTML 끝에 . 추가
                 html_area.send_keys(".")
 
-                # -----------------------------
                 # 다시 에디터 모드
-                # -----------------------------
                 html_button.click()
 
                 editor = wait.until(
@@ -210,26 +206,20 @@ def modify_post_editor(
 
                 editor.click()
 
-
             editor.send_keys(Keys.SHIFT, Keys.ENTER)
-        
+
         # ============================================
         # 수정 버튼
         # ============================================
-      
-      
-        if has_url:
-            WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".og-div")
-                )
-            )
 
         write_button = wait.until(
             EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, "button.btn_blue.write")
+                (
+                    By.CSS_SELECTOR,
+                    "button.btn_blue.write"
+                )
             )
-        )      
+        )
 
         write_button.click()
 
@@ -237,9 +227,9 @@ def modify_post_editor(
             "success": True
         }
 
-
     except Exception as e:
-        print(traceback.format_exc(), flush=True)
+
+        traceback.print_exc()
 
         return {
             "success": False,
@@ -247,7 +237,11 @@ def modify_post_editor(
         }
 
     finally:
+
         elapsed = time.perf_counter() - start
-        print(f"[modify_post] 실행시간: {elapsed:.2f}초")
+
+        print(
+            f"[modify_post] 실행시간: {elapsed:.2f}초"
+        )
+
         driver.quit()
-        
