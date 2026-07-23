@@ -42,12 +42,20 @@ def modify_post(
     options.add_argument("--metrics-recording-only")
     options.add_argument("--disable-default-apps")
 
+    # 이미지 로딩 차단
+    options.add_experimental_option(
+        "prefs",
+        {
+            "profile.managed_default_content_settings.images": 2
+        }
+    )
+
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/150.0.0.0 Safari/537.36"
     )
-
+  
     driver = webdriver.Chrome(options=options)
 
     wait = WebDriverWait(driver, 5)
