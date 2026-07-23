@@ -1,4 +1,4 @@
-name: Test Google Sheets
+name: Nickdate Crawler
 
 on:
   workflow_dispatch:
