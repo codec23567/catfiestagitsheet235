@@ -143,12 +143,14 @@ def modify_post(
 
         html_area.clear()
 
+
+       
         # ============================================
         # 일반 에디터 모드
         # ============================================
-
+        
         html_button.click()
-
+        
         editor = wait.until(
             EC.visibility_of_element_located(
                 (
@@ -157,89 +159,111 @@ def modify_post(
                 )
             )
         )
-
+        
         editor.click()
-
+        
         url_pattern = re.compile(r"^https?://\S+$")
         
-        buffer = []
+        lines = text.splitlines()
+        has_url = any(url_pattern.match(line.strip()) for line in lines)
         
-        for line in text.splitlines():
+        # --------------------------------------------
+        # URL이 없는 경우 : 기존 방식
+        # --------------------------------------------
+        if not has_url:
         
-            print(f"입력: [{line}]", flush=True)
+            for line in lines:
         
-            # URL이 아니면 버퍼에 저장
-            if not url_pattern.match(line.strip()):
-                buffer.append(line)
-                continue
+                print(f"입력: [{line}]", flush=True)
         
-            # URL을 만나면 지금까지의 일반 텍스트를 한 번에 입력
+                editor.send_keys(line)
+                editor.send_keys(Keys.SHIFT, Keys.ENTER)
+        
+        # --------------------------------------------
+        # URL이 있는 경우 : 버퍼 방식
+        # --------------------------------------------
+        else:
+        
+            buffer = []
+        
+            for line in lines:
+        
+                print(f"입력: [{line}]", flush=True)
+        
+                # URL이 아니면 버퍼에 저장
+                if not url_pattern.match(line.strip()):
+                    buffer.append(line)
+                    continue
+        
+                # URL 직전 일반 텍스트 입력
+                if buffer:
+        
+                    editor.send_keys("\n".join(buffer))
+                    buffer.clear()
+        
+                print("URL 발견", flush=True)
+        
+                # URL 입력
+                editor.send_keys(line)
+        
+                driver.execute_script(
+                    "oglink('paste', false, '');"
+                )
+        
+                short_wait.until(
+                    EC.presence_of_element_located(
+                        (
+                            By.CSS_SELECTOR,
+                            ".og-div"
+                        )
+                    )
+                )
+        
+                print("OG 생성 완료", flush=True)
+        
+                # HTML 모드
+                html_button.click()
+        
+                html_area = wait.until(
+                    EC.visibility_of_element_located(
+                        (
+                            By.CSS_SELECTOR,
+                            ".note-codable"
+                        )
+                    )
+                )
+        
+                # HTML 끝에 . 추가
+                html_area.send_keys(".")
+        
+                # 다시 에디터 모드
+                html_button.click()
+        
+                editor = wait.until(
+                    EC.visibility_of_element_located(
+                        (
+                            By.CSS_SELECTOR,
+                            ".note-editable"
+                        )
+                    )
+                )
+        
+                editor.click()
+        
+                # URL 뒤 줄바꿈
+                editor.send_keys(Keys.SHIFT, Keys.ENTER)
+        
+            # 마지막 일반 텍스트 입력
             if buffer:
         
                 editor.send_keys("\n".join(buffer))
         
-                buffer.clear()
-        
-            print("URL 발견", flush=True)
-        
-            # URL 입력
-            editor.send_keys(line)
-        
-            driver.execute_script(
-                "oglink('paste', false, '');"
-            )
-        
-            short_wait.until(
-                EC.presence_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        ".og-div"
-                    )
-                )
-            )
-        
-            print("OG 생성 완료", flush=True)
-        
-            # HTML 모드
-            html_button.click()
-        
-            html_area = wait.until(
-                EC.visibility_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        ".note-codable"
-                    )
-                )
-            )
-        
-            # HTML 끝에 . 추가
-            html_area.send_keys(".")
-        
-            # 다시 에디터 모드
-            html_button.click()
-        
-            editor = wait.until(
-                EC.visibility_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        ".note-editable"
-                    )
-                )
-            )
-        
-            editor.click()
-        
-            # URL 뒤 줄바꿈
-            editor.send_keys(Keys.SHIFT, Keys.ENTER)
-        
-        # 마지막 일반 텍스트 입력
-        if buffer:
-        
-            editor.send_keys("\n".join(buffer))
-        
         print(f"[시간] 본문입력 : {time.perf_counter()-t:.2f}초", flush=True)
         t = time.perf_counter()
 
+
+
+        
         # ============================================
         # 수정 버튼
         # ============================================
