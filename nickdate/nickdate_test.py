@@ -6,18 +6,27 @@ import time
 
 def extract_nickdate(url):
 
-    start = time.time()
+    total_start = time.time()
 
     headers = {
         "User-Agent": "Mozilla/5.0"
     }
 
     try:
+
+        # -------------------------
+        # HTTP 요청
+        # -------------------------
+
+        request_start = time.time()
+
         response = requests.get(
             url,
             headers=headers,
             timeout=30
         )
+
+        request_time = time.time() - request_start
 
         html = response.text
 
@@ -25,6 +34,11 @@ def extract_nickdate(url):
             f"[응답] 상태={response.status_code}, "
             f"바이트={len(response.content)}, "
             f"URL={url}",
+            flush=True
+        )
+
+        print(
+            f"[시간] HTTP 요청 : {request_time:.4f}초",
             flush=True
         )
 
@@ -42,12 +56,16 @@ def extract_nickdate(url):
         author = ""
 
         # -------------------------
-        # gallview_head 영역만 추출
+        # gallview_head 영역 추출
         # -------------------------
+
+        head_start_time = time.time()
 
         head_part = html
 
-        head_start = html.find('<div class="gallview_head"')
+        head_start = html.find(
+            '<div class="gallview_head"'
+        )
 
         if head_start != -1:
 
@@ -57,13 +75,26 @@ def extract_nickdate(url):
             )
 
             if head_end != -1:
-                head_part = html[head_start:head_end]
+                head_part = html[
+                    head_start:head_end
+                ]
             else:
-                head_part = html[head_start:]
+                head_part = html[
+                    head_start:
+                ]
+
+        head_time = time.time() - head_start_time
+
+        print(
+            f"[시간] 헤더 추출 : {head_time:.6f}초",
+            flush=True
+        )
 
         # -------------------------
         # 작성자 추출
         # -------------------------
+
+        author_start_time = time.time()
 
         author_match = re.search(
             r'data-nick="([^"]+)"'
@@ -89,9 +120,18 @@ def extract_nickdate(url):
             else:
                 author = nick
 
+        author_time = time.time() - author_start_time
+
+        print(
+            f"[시간] 작성자 추출 : {author_time:.6f}초",
+            flush=True
+        )
+
         # -------------------------
         # 날짜 추출
         # -------------------------
+
+        date_start_time = time.time()
 
         date_match = (
             re.search(
@@ -119,10 +159,23 @@ def extract_nickdate(url):
                 raw_date.replace("-", ". ")
             )
 
+        date_time = time.time() - date_start_time
+
+        print(
+            f"[시간] 날짜 추출 : {date_time:.6f}초",
+            flush=True
+        )
+
+        total_time = time.time() - total_start
+
         print(
             f"[결과] 날짜={date}, "
-            f"작성자={author}, "
-            f"시간={time.time() - start:.2f}초",
+            f"작성자={author}",
+            flush=True
+        )
+
+        print(
+            f"[시간] 총 소요 : {total_time:.4f}초",
             flush=True
         )
 
