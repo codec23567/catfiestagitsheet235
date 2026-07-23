@@ -1,10 +1,14 @@
 import os
 import json
+import time
 
 import gspread
 from google.oauth2.service_account import Credentials
 from nickdate_test import extract_nickdate
 from concurrent.futures import ThreadPoolExecutor
+
+# 프로그램 시작 시간
+program_start = time.time()
 
 # Google Sheets API 권한
 SCOPES = [
@@ -24,7 +28,6 @@ spreadsheet = gc.open_by_key(
     "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
 )
 
-
 worksheet = spreadsheet.worksheet(
     os.environ["TARGET_SHEET"]
 )
@@ -32,12 +35,10 @@ worksheet = spreadsheet.worksheet(
 # 실제 데이터가 시작되는 행
 start_row = 5
 
-
 # C열(URL), E열(날짜), F열(작성자) 읽기
 urls = worksheet.col_values(3)
 dates = worksheet.col_values(5)
 authors = worksheet.col_values(6)
-
 
 # E/F열 길이가 부족하면 빈 문자열로 맞춰줌
 while len(dates) < len(urls):
@@ -45,7 +46,6 @@ while len(dates) < len(urls):
 
 while len(authors) < len(urls):
     authors.append("")
-
 
 # 크롤링 대상 URL과 행 번호 저장
 requests = []
@@ -83,7 +83,6 @@ print("크롤링 대상 개수 :", len(requests))
 for row, url in zip(target_rows, requests):
     print(row, url)
 
-
 # ---------------------------------------------
 # 최대 3회까지 실패한 URL만 재시도
 # ---------------------------------------------
@@ -99,9 +98,19 @@ while pending_requests and current_try < MAX_RETRIES:
 
     print(f"\n===== {current_try + 1}차 시도 =====")
 
+    batch_start = time.time()
+
     # 병렬 크롤링
     with ThreadPoolExecutor(max_workers=20) as executor:
         results = list(executor.map(extract_nickdate, pending_requests))
+
+    batch_time = time.time() - batch_start
+
+    print(
+        f"[전체] {len(pending_requests)}개 URL 병렬 처리 완료 : "
+        f"{batch_time:.2f}초",
+        flush=True
+    )
 
     # 다음 재시도 대상
     next_pending_requests = []
@@ -134,7 +143,6 @@ while pending_requests and current_try < MAX_RETRIES:
 
     current_try += 1
 
-
 # ---------------------------------------------
 # 3번 시도 후에도 실패하면 retry 기록
 # ---------------------------------------------
@@ -143,10 +151,11 @@ for row in pending_rows:
     dates[row - 1] = "retry"
     authors[row - 1] = ""
 
-
 # ---------------------------------------------
 # 결과를 Google Sheets에 저장
 # ---------------------------------------------
+
+sheet_start = time.time()
 
 date_values = [[d] for d in dates[start_row - 1:]]
 author_values = [[a] for a in authors[start_row - 1:]]
@@ -159,6 +168,18 @@ worksheet.update(
 worksheet.update(
     range_name=f"F{start_row}:F{start_row + len(author_values) - 1}",
     values=author_values
+)
+
+sheet_time = time.time() - sheet_start
+
+print(
+    f"[전체] Google Sheets 저장 : {sheet_time:.2f}초",
+    flush=True
+)
+
+print(
+    f"[전체] 프로그램 실행 : {time.time() - program_start:.2f}초",
+    flush=True
 )
 
 print("완료")
