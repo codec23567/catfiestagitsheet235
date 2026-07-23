@@ -1,10 +1,31 @@
 import os
 import json
+from urllib.parse import urlparse
 
 import gspread
 from google.oauth2.service_account import Credentials
 
 from login_modify_normal_bl import modify_post
+
+
+# -------------------------------------------------
+# 모바일 URL -> 수정 URL 변환
+# -------------------------------------------------
+
+def convert_modify_url(url: str) -> str:
+    path = urlparse(url).path.strip("/").split("/")
+
+    # https://m.dcinside.com/board/{gallery_id}/{post_no}
+    if len(path) >= 3 and path[0] == "board":
+        gallery_id = path[1]
+        post_no = path[2]
+
+        return (
+            f"https://gall.dcinside.com/mgallery/board/modify/"
+            f"?id={gallery_id}&no={post_no}"
+        )
+
+    raise ValueError(f"지원하지 않는 URL 형식: {url}")
 
 
 # -------------------------------------------------
@@ -61,6 +82,24 @@ if not modify_url:
     )
 
     print(f"{row}행 : URL 없음")
+    exit()
+
+
+# -------------------------------------------------
+# URL 변환
+# -------------------------------------------------
+
+try:
+    modify_url = convert_modify_url(modify_url)
+
+except Exception as e:
+
+    worksheet.update(
+        range_name=f"I{row}",
+        values=[[f"URL 오류 : {e}"]]
+    )
+
+    print(f"{row}행 URL 오류 : {e}")
     exit()
 
 
