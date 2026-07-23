@@ -7,53 +7,61 @@ from google.oauth2.service_account import Credentials
 from login_modify_normal_bl import modify_post
 
 
+# -------------------------------------------------
+# Google Sheets 인증
+# -------------------------------------------------
+
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets"
 ]
 
-creds_info = json.loads(os.environ["GOOGLE_CREDENTIALS"])
-
-creds = Credentials.from_service_account_info(
-    creds_info,
+credentials = Credentials.from_service_account_info(
+    json.loads(os.environ["GOOGLE_CREDENTIALS"]),
     scopes=SCOPES
 )
 
-gc = gspread.authorize(creds)
+gc = gspread.authorize(credentials)
 
-spreadsheet = gc.open(
-    os.environ["SPREADSHEET_NAME"]
+spreadsheet = gc.open_by_key(
+    "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
 )
 
 worksheet = spreadsheet.worksheet(
     os.environ["TARGET_SHEET"]
 )
 
+
+# -------------------------------------------------
+# GitHub Secrets
+# -------------------------------------------------
+
 user_id = os.environ["CAT_ID"]
 user_pw = os.environ["CAT_PW"]
 
-# 작업할 행 번호
-row = int(os.environ["ROW"])
 
-# G열 : 수정 URL
-modify_url = worksheet.acell(f"G{row}").value
+# -------------------------------------------------
+# 시트 데이터 읽기
+# -------------------------------------------------
 
-# H열 : 수정 본문
-text = worksheet.acell(f"H{row}").value
+modify_url = worksheet.acell("M3").value
 
-# 내용이 없으면 작업하지 않음
-if not (text or "").strip():
-    print(f"H{row}가 비어 있어 작업을 건너뜁니다.")
+if modify_url:
+    modify_url = modify_url.strip()
+else:
+    modify_url = ""
+
+text = (worksheet.acell("M4").value or "").replace("§", "\n\n")
+
+
+# URL이 없으면 종료
+if not modify_url:
+    print("수정 URL이 없습니다.")
     exit()
 
-text = text.replace("§", "\n\n")
 
-# URL도 없으면 작업하지 않음
-if not (modify_url or "").strip():
-    worksheet.update(
-        range_name=f"I{row}",
-        values=[["실패 : URL 없음"]]
-    )
-    exit()
+# -------------------------------------------------
+# 게시글 수정
+# -------------------------------------------------
 
 result = modify_post(
     user_id,
@@ -62,13 +70,27 @@ result = modify_post(
     text
 )
 
+
+# -------------------------------------------------
+# 결과 기록
+# -------------------------------------------------
+
 if result["success"]:
+
     worksheet.update(
-        range_name=f"I{row}",
+        range_name="M7",
         values=[["완료"]]
     )
+
+    print("완료")
+
 else:
+
+    message = result.get("message", "알 수 없는 오류")
+
     worksheet.update(
-        range_name=f"I{row}",
-        values=[[f"실패 : {result.get('message', '알 수 없는 오류')}"]]
+        range_name="M7",
+        values=[[f"실패 : {message}"]]
     )
+
+    print(f"실패 : {message}")
