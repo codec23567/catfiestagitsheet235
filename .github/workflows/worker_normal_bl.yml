@@ -1,0 +1,42 @@
+name: Worker Normal_bl
+
+on:
+  workflow_dispatch:
+    inputs:
+      row:
+        description: "Sheet Row"
+        required: true
+        type: string
+
+      sheet_name:
+        description: "Target sheet"
+        required: true
+        type: string
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium gspread google-auth
+
+      - name: Run Worker
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
+          ROW: ${{ github.event.inputs.row }}
+          CAT_ID: ${{ secrets.CAT_ID }}
+          CAT_PW: ${{ secrets.CAT_PW }}
+        run: |
+          python modify_normal_bl_ver/read_host_normal_bl.py
