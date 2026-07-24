@@ -39,3 +39,40 @@ jobs:
 
           echo "===== jobs.json ====="
           cat jobs.json
+          
+      - name: Dispatch Workers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHEET_NAME: ${{ github.event.inputs.sheet_name }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+      
+          with open("jobs.json", "r", encoding="utf-8") as f:
+              jobs = json.load(f)["include"]
+      
+          for job in jobs:
+              row = str(job["row"])
+      
+              print(f"Dispatch row {row}")
+      
+              subprocess.run([
+                  "curl",
+                  "-L",
+                  "-X", "POST",
+                  "-H", "Accept: application/vnd.github+json",
+                  "-H", f"Authorization: Bearer {os.environ['GH_TOKEN']}",
+                  f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/actions/workflows/worker_normal_bl.yml/dispatches",
+                  "-d",
+                  json.dumps({
+                      "ref": os.environ["GITHUB_REF_NAME"],
+                      "inputs": {
+                          "row": row,
+                          "sheet_name": os.environ["SHEET_NAME"]
+                      }
+                  })
+              ], check=True)
+      
+          PY
