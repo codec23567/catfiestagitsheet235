@@ -8,6 +8,10 @@ on:
         required: true
         type: string
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   modify-normal:
     runs-on: ubuntu-latest
@@ -26,10 +30,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install selenium gspread google-auth
 
-      - name: Run Modify Normal
+      - name: Build Job List
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
-          CAT_ID: ${{ secrets.CAT_ID }}
-          CAT_PW: ${{ secrets.CAT_PW }}
-        run: python modify_normal_bl_ver/factory_host.py
+        run: |
+          python modify_normal_bl_ver/factory_host.py > jobs.json
+
+          echo "===== jobs.json ====="
+          cat jobs.json
