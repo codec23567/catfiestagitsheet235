@@ -187,35 +187,6 @@ def modify_post(
 
                 print("OG 생성 완료", flush=True)
 
-                # HTML 모드
-                html_button.click()
-
-                html_area = wait.until(
-                    EC.visibility_of_element_located(
-                        (
-                            By.CSS_SELECTOR,
-                            ".note-codable"
-                        )
-                    )
-                )
-
-                # HTML 끝에 . 추가
-                html_area.send_keys(".")
-
-                # 다시 에디터 모드
-                html_button.click()
-
-                editor = wait.until(
-                    EC.visibility_of_element_located(
-                        (
-                            By.CSS_SELECTOR,
-                            ".note-editable"
-                        )
-                    )
-                )
-
-                editor.click()
-
             editor.send_keys(Keys.SHIFT, Keys.ENTER)
 
         print(f"[시간] 본문입력 : {time.perf_counter()-t:.2f}초", flush=True)
