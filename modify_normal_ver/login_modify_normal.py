@@ -160,6 +160,7 @@ def modify_post(user_id, user_pw, modify_url, text):
                 )
 
                 # HTML 끝에 . 추가
+                html_area.send_keys(Keys.END)
                 html_area.send_keys(".")
 
                 # 다시 에디터 모드
