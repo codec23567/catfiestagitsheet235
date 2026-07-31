@@ -132,49 +132,30 @@ def modify_post(user_id, user_pw, modify_url, text):
 
         url_pattern = re.compile(r"^https?://\S+$")
 
+
         for line in text.splitlines():
             print(f"입력: [{line}]", flush=True)
-
+        
             editor.send_keys(line)
-
+        
             if url_pattern.match(line.strip()):
                 print("URL 발견", flush=True)
-
+        
                 driver.execute_script("oglink('paste', false, '');")
-
+        
                 short_wait.until(
                     EC.presence_of_element_located(
                         (By.CSS_SELECTOR, ".og-div")
                     )
                 )
+        
                 print("===== OG 생성 직후 HTML =====", flush=True)
                 print(editor.get_attribute("innerHTML"), flush=True)
                 print("OG 생성 완료", flush=True)
-
-                # HTML 모드
-                html_button.click()
-
-                html_area = wait.until(
-                    EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, ".note-codable")
-                    )
-                )
-                
-                html_area.send_keys(Keys.END)
-                html_area.send_keys("<p><br></p>")
-
-                # 다시 에디터 모드
-                html_button.click()
-
-                editor = wait.until(
-                    EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, ".note-editable")
-                    )
-                )
-                editor.click()
-
+        
             editor.send_keys(Keys.SHIFT, Keys.ENTER)
 
+        
         print(f"[시간] 본문입력 : {time.perf_counter() - t:.2f}초", flush=True)
         t = time.perf_counter()
 
