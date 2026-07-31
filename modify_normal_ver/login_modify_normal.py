@@ -167,11 +167,8 @@ def modify_post(user_id, user_pw, modify_url, text):
                     )
                 )
 
-                html = html_area.get_attribute("value")
-                html += "<p><br></p>"
-                
-                html_area.clear()
-                html_area.send_keys(html)
+                html_area.send_keys(Keys.END)
+                html_area.send_keys("<p><br></p>")
 
                 # 다시 에디터 모드
                 html_button.click()
@@ -181,17 +178,7 @@ def modify_post(user_id, user_pw, modify_url, text):
                         (By.CSS_SELECTOR, ".note-editable"),
                     )
                 )
-                driver.execute_script("""
-                arguments[0].focus();
-                
-                const range = document.createRange();
-                range.selectNodeContents(arguments[0]);
-                range.collapse(false);
-                
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-                """, editor)
+                editor.click()
 
             editor.send_keys(Keys.SHIFT, Keys.ENTER)
 
