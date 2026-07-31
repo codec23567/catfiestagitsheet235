@@ -184,7 +184,8 @@ def modify_post(
                         )
                     )
                 )
-                
+                print("===== OG 생성 직후 HTML =====", flush=True)
+                print(editor.get_attribute("innerHTML"), flush=True)
                 print("OG 생성 완료", flush=True)
 
                 # HTML 모드
@@ -198,9 +199,10 @@ def modify_post(
                         )
                     )
                 )
+                print("===== HTML 모드 내용 =====", flush=True)
                 print(html_area.get_attribute("value"))
-                # HTML 끝에 . 추가
-                html_area.send_keys(".")
+                
+                html_area.send_keys("<br>")
 
                 # 다시 에디터 모드
                 html_button.click()
