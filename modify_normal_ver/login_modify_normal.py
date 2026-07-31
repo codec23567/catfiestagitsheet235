@@ -54,7 +54,7 @@ def modify_post(user_id, user_pw, modify_url, text):
     driver = webdriver.Chrome(options=options)
 
     wait = WebDriverWait(driver, 5)
-    short_wait = WebDriverWait(driver, 5)
+    short_wait = WebDriverWait(driver, 20)
 
     try:
         # ============================================
