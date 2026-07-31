@@ -156,11 +156,28 @@ def modify_post(user_id, user_pw, modify_url, text):
                 driver.execute_script("oglink('paste', false, '');")
 
                 # 새 OG 카드가 실제로 하나 추가될 때까지 대기
-                short_wait.until(
-                    lambda d: len(
-                        d.find_elements(By.CSS_SELECTOR, ".og-div")
-                    ) > og_count_before
-                )
+                try:
+                    short_wait.until(
+                        lambda d: len(
+                            d.find_elements(By.CSS_SELECTOR, ".og-div")
+                        ) > og_count_before
+                    )
+                except Exception:
+                    # OG 카드가 생성되지 않았을 때 상태를 로그에 남긴다.
+                    current_og_count = len(
+                        driver.find_elements(By.CSS_SELECTOR, ".og-div")
+                    )
+                
+                    print(
+                        f"OG 카드 생성 실패: 기존 {og_count_before}개 / "
+                        f"현재 {current_og_count}개",
+                        flush=True,
+                    )
+                
+                    print("===== OG 생성 실패 시점 HTML =====", flush=True)
+                    print(editor.get_attribute("innerHTML"), flush=True)
+                
+                    raise
 
                 print("OG 생성 완료", flush=True)
 
