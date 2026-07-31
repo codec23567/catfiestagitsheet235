@@ -184,7 +184,7 @@ def modify_post(
                         )
                     )
                 )
-
+                print(editor.get_attribute("innerHTML"))
                 print("OG 생성 완료", flush=True)
 
                 # HTML 모드
