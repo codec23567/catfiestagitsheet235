@@ -124,7 +124,10 @@ def modify_post(user_id, user_pw, modify_url, text):
                 (By.CSS_SELECTOR, ".note-editable"),
             )
         )
+        
+        # 비운 본문의 맨 끝에서 입력을 시작한다.
         editor.click()
+        editor.send_keys(Keys.CONTROL, Keys.END)
 
         # 한 줄 전체가 URL인 경우에만 OG 카드 생성
         url_pattern = re.compile(r"^https?://\S+$")
@@ -214,7 +217,10 @@ def modify_post(user_id, user_pw, modify_url, text):
                             (By.CSS_SELECTOR, ".note-editable"),
                         )
                     )
+                    
+                    # HTML 모드 전환 후에도 다음 빈 문단의 끝에서 계속 입력한다.
                     editor.click()
+                    editor.send_keys(Keys.CONTROL, Keys.END)
 
                 # URL 뒤에는 별도의 Enter를 보내지 않는다.
                 # 위에서 추가한 <p><br></p>가 다음 입력 위치를 만든다.
