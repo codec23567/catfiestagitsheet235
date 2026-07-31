@@ -147,7 +147,8 @@ def modify_post(user_id, user_pw, modify_url, text):
                         (By.CSS_SELECTOR, ".og-div")
                     )
                 )
-
+                print("===== OG 생성 직후 HTML =====", flush=True)
+                print(editor.get_attribute("innerHTML"), flush=True)
                 print("OG 생성 완료", flush=True)
 
                 # HTML 모드
@@ -158,8 +159,7 @@ def modify_post(user_id, user_pw, modify_url, text):
                         (By.CSS_SELECTOR, ".note-codable")
                     )
                 )
-
-                # HTML 끝에 . 추가
+                
                 html_area.send_keys(Keys.END)
                 html_area.send_keys("<p><br></p>")
 
