@@ -60,7 +60,6 @@ def modify_post(user_id, user_pw, modify_url, text):
         # ============================================
         # 로그인
         # ============================================
-
         driver.get(LOGIN_URL)
 
         id_input = wait.until(
@@ -94,7 +93,6 @@ def modify_post(user_id, user_pw, modify_url, text):
         # ============================================
         # 수정 페이지 이동
         # ============================================
-
         driver.get(modify_url)
 
         html_button = wait.until(
@@ -107,14 +105,9 @@ def modify_post(user_id, user_pw, modify_url, text):
         t = time.perf_counter()
 
         # ============================================
-        # HTML 모드
+        # 기존 본문 삭제
         # ============================================
-
         html_button.click()
-
-        # ============================================
-        # HTML 내용 삭제
-        # ============================================
 
         html_area = wait.until(
             EC.visibility_of_element_located(
@@ -123,10 +116,7 @@ def modify_post(user_id, user_pw, modify_url, text):
         )
         html_area.clear()
 
-        # ============================================
-        # 일반 에디터 모드
-        # ============================================
-
+        # 일반 에디터 모드로 복귀
         html_button.click()
 
         editor = wait.until(
@@ -136,65 +126,94 @@ def modify_post(user_id, user_pw, modify_url, text):
         )
         editor.click()
 
+        # 한 줄 전체가 URL인 경우에만 OG 카드 생성
         url_pattern = re.compile(r"^https?://\S+$")
+        lines = text.splitlines()
 
-        for line in text.splitlines():
+        # ============================================
+        # 본문 입력
+        # ============================================
+        for index, line in enumerate(lines):
+            is_url = bool(url_pattern.fullmatch(line.strip()))
+            is_last_line = index == len(lines) - 1
+
             print(f"입력: [{line}]", flush=True)
 
-            editor.send_keys(line)
+            # 빈 줄은 텍스트를 입력하지 않고 Enter만 처리
+            if line:
+                editor.send_keys(line)
 
-            if url_pattern.match(line.strip()):
-                print("URL 발견", flush=True)
+            if is_url:
+                print("URL 발견 - OG 카드 생성 시작", flush=True)
+
+                # 이미 존재하는 OG 카드 수를 기록한다.
+                # 단순히 .og-div의 존재만 기다리면 두 번째 URL부터는
+                # 기존 카드 때문에 즉시 통과하는 문제가 생긴다.
+                og_count_before = len(
+                    driver.find_elements(By.CSS_SELECTOR, ".og-div")
+                )
 
                 driver.execute_script("oglink('paste', false, '');")
 
+                # 새 OG 카드가 실제로 하나 추가될 때까지 대기
                 short_wait.until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, ".og-div"),
-                    )
+                    lambda d: len(
+                        d.find_elements(By.CSS_SELECTOR, ".og-div")
+                    ) > og_count_before
                 )
 
-                print("===== OG 생성 직후 HTML =====", flush=True)
-                print(editor.get_attribute("innerHTML"), flush=True)
                 print("OG 생성 완료", flush=True)
 
-                # HTML 모드
-                html_button.click()
+                # OG 카드 뒤에는 일반 모드에서 커서가 안정적으로 놓이지
+                # 않을 수 있다. HTML 모드에서 다음 내용을 위한 빈 문단을
+                # 직접 추가한 뒤 다시 일반 에디터 모드로 돌아온다.
+                if not is_last_line:
+                    html_button.click()
 
-                html_area = wait.until(
-                    EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, ".note-codable"),
+                    html_area = wait.until(
+                        EC.visibility_of_element_located(
+                            (By.CSS_SELECTOR, ".note-codable"),
+                        )
                     )
-                )
 
-                html_area.send_keys(Keys.END)
-                html_area.send_keys("<p><br></p>")
-
-                # 다시 에디터 모드
-                html_button.click()
-
-                editor = wait.until(
-                    EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, ".note-editable"),
+                    driver.execute_script(
+                        """
+                        const area = arguments[0];
+                        area.value += '<p><br></p>';
+                        area.dispatchEvent(
+                            new Event('input', { bubbles: true })
+                        );
+                        area.dispatchEvent(
+                            new Event('change', { bubbles: true })
+                        );
+                        """,
+                        html_area,
                     )
-                )
-                editor.click()
 
-            editor.send_keys(Keys.SHIFT, Keys.ENTER)
+                    html_button.click()
+
+                    editor = wait.until(
+                        EC.visibility_of_element_located(
+                            (By.CSS_SELECTOR, ".note-editable"),
+                        )
+                    )
+                    editor.click()
+
+                # URL 뒤에는 별도의 Enter를 보내지 않는다.
+                # 위에서 추가한 <p><br></p>가 다음 입력 위치를 만든다.
+                continue
+
+            # 일반 텍스트와 빈 줄은 다음 줄로 이동한다.
+            # 마지막 줄 뒤에는 불필요한 줄바꿈을 넣지 않는다.
+            if not is_last_line:
+                editor.send_keys(Keys.ENTER)
 
         print(f"[시간] 본문입력 : {time.perf_counter() - t:.2f}초", flush=True)
         t = time.perf_counter()
 
         # ============================================
-        # 수정 버튼
+        # 저장 전 HTML 확인
         # ============================================
-
-        write_button = wait.until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, "button.btn_blue.write"),
-            )
-        )
-
         html_button.click()
 
         html_area = wait.until(
@@ -203,8 +222,26 @@ def modify_post(user_id, user_pw, modify_url, text):
             )
         )
 
+        print("===== 저장 직전 HTML =====", flush=True)
         print(html_area.get_attribute("value"), flush=True)
 
+        # 저장 전 일반 에디터 모드로 복귀하여 HTML 변경 내용을 확정한다.
+        html_button.click()
+
+        wait.until(
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, ".note-editable"),
+            )
+        )
+
+        # ============================================
+        # 수정 버튼 클릭
+        # ============================================
+        write_button = wait.until(
+            EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, "button.btn_blue.write"),
+            )
+        )
         write_button.click()
 
         print(f"[시간] 저장 : {time.perf_counter() - t:.2f}초", flush=True)
@@ -224,6 +261,6 @@ def modify_post(user_id, user_pw, modify_url, text):
     finally:
         elapsed = time.perf_counter() - start
 
-        print(f"[modify_post] 실행시간: {elapsed:.2f}초")
+        print(f"[modify_post] 실행시간: {elapsed:.2f}초", flush=True)
 
         driver.quit()
