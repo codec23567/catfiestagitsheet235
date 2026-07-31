@@ -167,6 +167,7 @@ def modify_post(user_id, user_pw, modify_url, text):
                     )
                 )
 
+                html_area.send_keys(Keys.END)
                 html_area.send_keys("<p><br></p>")
 
                 # 다시 에디터 모드
