@@ -187,7 +187,15 @@ def modify_post(user_id, user_pw, modify_url, text):
                 (By.CSS_SELECTOR, "button.btn_blue.write")
             )
         )
-
+        html_button.click()
+        
+        html_area = wait.until(
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, ".note-codable")
+            )
+        )
+        
+        print(html_area.get_attribute("value"), flush=True)
         write_button.click()
 
         print(f"[시간] 저장 : {time.perf_counter() - t:.2f}초", flush=True)
