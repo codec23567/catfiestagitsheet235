@@ -28,4 +28,4 @@ jobs:
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
-        run: python modify_normal_bl_ver/gumsa.py
+        run: python modify_normal_bl_ver/gumsasil.py
