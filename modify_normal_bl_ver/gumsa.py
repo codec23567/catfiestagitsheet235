@@ -1,76 +1,102 @@
-import html
-import re
+"""G열의 URL을 병렬로 처리하는 실행 스크립트.
+
+필수 환경 변수:
+  GOOGLE_CREDENTIALS : 서비스 계정 JSON 문자열
+  TARGET_SHEET       : 처리할 워크시트 이름
+
+선택 환경 변수:
+  SPREADSHEET_ID     : 대상 스프레드시트 ID
+  MAX_WORKERS        : 동시 실행 수 (기본 20)
+"""
+
+import json
+import os
 import time
-from urllib.parse import urljoin
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import requests
+import gspread
+from google.oauth2.service_account import Credentials
+
+from gumsa import extract_links
 
 
-def extract_links(url):
-    total_start = time.time()
+START_ROW = 5
+URL_COLUMN = 7  # G열
+DEFAULT_SPREADSHEET_ID = "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
 
+
+def process_url(row: int, url: str):
+    """행 번호를 보존한 채 gumsa.extract_links를 실행한다."""
     try:
-        response = requests.get(
-            url,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=30,
-        )
-        response.raise_for_status()
+        return row, url, extract_links(url), None
+    except Exception as error:  # 한 URL 실패가 전체 실행을 멈추지 않게 함
+        return row, url, None, error
 
-        print(f"[응답] 상태={response.status_code}, 바이트={len(response.content)}",
-              flush=True)
 
-        page_html = response.text
+def result_value(result) -> str:
+    """extract_links의 반환값을 같은 행의 L열에 기록할 문자열로 변환한다."""
+    if result is None:
+        return "결과 없음"
 
-        # 본문(write_div) 영역만 대상으로 추출
-        body_part = page_html
-        body_start = page_html.find('class="write_div"')
+    if isinstance(result, (list, tuple, set)):
+        values = [str(value) for value in result if value is not None]
+        return "\n".join(values) if values else "결과 없음"
 
-        if body_start != -1:
-            body_end = page_html.find(
-                '<script id="mg_numbering-tmpl"',
-                body_start,
-            )
+    if isinstance(result, dict):
+        return json.dumps(result, ensure_ascii=False)
 
-            if body_end == -1:
-                body_end = page_html.find("<script", body_start)
+    return str(result)
 
-            body_part = (
-                page_html[body_start:body_end]
-                if body_end != -1
-                else page_html[body_start:]
-            )
 
-        # <a href="..."> 또는 <a href='...'> 추출
-        href_regex = re.compile(
-            r'<a\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\']',
-            re.IGNORECASE,
-        )
+def main():
+    started_at = time.time()
 
-        links = []
-        seen = set()
+    credentials = Credentials.from_service_account_info(
+        json.loads(os.environ["GOOGLE_CREDENTIALS"]),
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    )
+    worksheet = gspread.authorize(credentials).open_by_key(
+        os.getenv("SPREADSHEET_ID", DEFAULT_SPREADSHEET_ID)
+    ).worksheet(os.environ["TARGET_SHEET"])
 
-        for href in href_regex.findall(body_part):
-            href = html.unescape(href).strip()
+    # G열을 읽고, 5행 이후에서 URL이 있는 행만 선별한다.
+    g_values = worksheet.col_values(URL_COLUMN)
+    targets = [
+        (row, value.strip())
+        for row, value in enumerate(g_values[START_ROW - 1 :], start=START_ROW)
+        if value.strip()
+    ]
 
-            # 페이지 내부 이동, JavaScript 링크 등 제외
-            if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+    print(f"처리 대상: {len(targets)}개")
+    if not targets:
+        return
+
+    max_workers = int(os.getenv("MAX_WORKERS", "20"))
+    succeeded = 0
+    failed = 0
+    completed_results = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_url, row, url) for row, url in targets]
+
+        for future in as_completed(futures):
+            row, url, result, error = future.result()
+            if error is not None:
+                failed += 1
+                print(f"실패 | {row}행 | {url} | {error}")
                 continue
 
-            # 상대 링크도 원래 게시글 주소 기준 절대 링크로 변환
-            href = urljoin(url, href)
+            succeeded += 1
+            print(f"완료 | {row}행 | {url} | {result}")
+            completed_results.append((row, result_value(result)))
 
-            # 중복 제거 및 http/https 링크만 유지
-            if href.startswith(("http://", "https://")) and href not in seen:
-                seen.add(href)
-                links.append(href)
+    # 결과는 원본 URL이 있는 행의 L열에 기록한다.
+    for row, value in completed_results:
+        worksheet.update(range_name=f"L{row}", values=[[value]])
 
-        print(f"[결과] 링크 수 : {len(links)}", flush=True)
-        print(f"[시간] 전체 : {time.time() - total_start:.2f}초", flush=True)
+    elapsed = time.time() - started_at
+    print(f"완료: 성공 {succeeded}개, 실패 {failed}개, 소요 {elapsed:.2f}초")
 
-        return links
 
-    except requests.RequestException as error:
-        print(f"[오류] {url}", flush=True)
-        print(error, flush=True)
-        return []
+if __name__ == "__main__":
+    main()
