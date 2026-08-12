@@ -12,6 +12,7 @@
 import json
 import os
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import gspread
@@ -35,23 +36,20 @@ def process_url(row: int, url: str):
         return row, url, None, error
 
 
-def result_value(result) -> str:
-    """extract_links의 반환값을 같은 행의 L열에 기록할 문자열로 변환한다."""
+def result_links(result) -> list[str]:
+    """extract_links 결과를 링크 목록으로 정리한다."""
     if result is None:
-        return "결과 없음"
+        return []
 
     if isinstance(result, (list, tuple, set)):
-        values = [str(value) for value in result if value is not None]
-        return "\n".join(values) if values else "결과 없음"
+        return [str(value).strip() for value in result if str(value).strip()]
 
-    if isinstance(result, dict):
-        return json.dumps(result, ensure_ascii=False)
-
-    return str(result)
+    # extract_links가 줄바꿈 문자열을 반환하는 경우도 처리한다.
+    return [value.strip() for value in str(result).splitlines() if value.strip()]
 
 
 def select_targets(b_values, c_values, g_values):
-    """B열의 이름 행부터 다음 이름 직전까지를 그룹으로 묶어 처리 대상을 선별한다."""
+    """B열 그룹별 C열 링크와 G열 모음집 링크를 처리 대상으로 선별한다."""
     last_row_count = max(len(b_values), len(c_values), len(g_values))
     targets = []
     group_start = START_ROW - 1
@@ -63,12 +61,12 @@ def select_targets(b_values, c_values, g_values):
             else ""
         )
 
-        # B열이 비어 있는 행은 이전 그룹에 포함되므로, 단독 그룹으로 처리하지 않는다.
+        # B열이 빈 행은 이전 그룹에 속하므로 시작점으로 처리하지 않는다.
         if not group_name:
             group_start += 1
             continue
 
-        # 다음 B열 이름이 나오기 직전까지를 현재 그룹으로 잡는다.
+        # 다음 B열 이름 직전까지를 하나의 그룹으로 잡는다.
         group_end = group_start + 1
         while group_end < last_row_count:
             next_name = (
@@ -80,22 +78,29 @@ def select_targets(b_values, c_values, g_values):
                 break
             group_end += 1
 
-        # 현재 그룹 범위 전체에서 C열의 비어 있지 않은 링크를 센다.
-        link_count = sum(
-            1
+        # 그룹 전체의 C열 링크를 수집한다.
+        c_links = [
+            c_values[row_index].strip()
             for row_index in range(group_start, group_end)
             if row_index < len(c_values) and c_values[row_index].strip()
-        )
+        ]
 
-        # 모음집 링크는 그룹 시작 행의 G열에만 있다고 보고 처리한다.
+        # 모음집 링크는 그룹 시작 행의 G열에 있다고 본다.
         group_url = (
             g_values[group_start].strip()
             if group_start < len(g_values)
             else ""
         )
 
-        if link_count >= 3 and group_url:
-            targets.append((group_start + 1, group_url))
+        # C열 링크가 3개 이상이고 G열 모음집 링크가 있을 때만 처리한다.
+        if len(c_links) >= 3 and group_url:
+            targets.append(
+                {
+                    "row": group_start + 1,
+                    "url": group_url,
+                    "c_links": c_links,
+                }
+            )
 
         group_start = group_end
 
@@ -113,7 +118,6 @@ def main():
         os.getenv("SPREADSHEET_ID", DEFAULT_SPREADSHEET_ID)
     ).worksheet(os.environ["TARGET_SHEET"])
 
-    # B열의 그룹과 C열 링크 개수를 기준으로 G열 URL 처리 대상을 선별한다.
     b_values = worksheet.col_values(NAME_COLUMN)
     c_values = worksheet.col_values(LINK_COLUMN)
     g_values = worksheet.col_values(URL_COLUMN)
@@ -126,25 +130,39 @@ def main():
     max_workers = int(os.getenv("MAX_WORKERS", "20"))
     succeeded = 0
     failed = 0
-    completed_results = []
+    completed_rows = []
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(process_url, row, url) for row, url in targets]
+        futures = {
+            executor.submit(process_url, target["row"], target["url"]): target
+            for target in targets
+        }
 
         for future in as_completed(futures):
+            target = futures[future]
             row, url, result, error = future.result()
+
             if error is not None:
                 failed += 1
                 print(f"실패 | {row}행 | {url} | {error}")
                 continue
 
             succeeded += 1
-            print(f"완료 | {row}행 | {url} | {result}")
-            completed_results.append((row, result_value(result)))
+            extracted_links = result_links(result)
 
-    # 결과는 모음집 링크가 있던 그룹 시작 행의 L열에 기록한다.
-    for row, value in completed_results:
-        worksheet.update(range_name=f"L{row}", values=[[value]])
+            # 순서와 중복 여부를 무시하지 않고, 링크 구성이 완전히 같은지 비교한다.
+            if Counter(extracted_links) == Counter(target["c_links"]):
+                completed_rows.append(row)
+                print(f"완료 | {row}행 | C열 링크와 결과가 일치")
+            else:
+                print(
+                    f"불일치 | {row}행 | "
+                    f"C열 {len(target['c_links'])}개 / 결과 {len(extracted_links)}개"
+                )
+
+    # G열의 조사 URL 바로 아래 셀에 완료 상태를 기록한다.
+    for row in completed_rows:
+        worksheet.update(range_name=f"G{row + 1}", values=[["작업 완료"]])
 
     elapsed = time.time() - started_at
     print(f"완료: 성공 {succeeded}개, 실패 {failed}개, 소요 {elapsed:.2f}초")
