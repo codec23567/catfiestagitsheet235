@@ -9,18 +9,14 @@ import re
 import time
 import traceback
 
+
 LOGIN_URL = (
     "https://sign.dcinside.com/login"
     "?s_url=https://www.dcinside.com/"
 )
 
 
-def modify_post(user_id, user_pw, modify_url, text):
-    print("★★★★★ modify_post 시작 ★★★★★", flush=True)
-
-    start = time.perf_counter()
-    t = time.perf_counter()
-
+def create_driver():
     options = Options()
     options.binary_location = "/usr/bin/google-chrome"
 
@@ -51,45 +47,58 @@ def modify_post(user_id, user_pw, modify_url, text):
         "Chrome/150.0.0.0 Safari/537.36"
     )
 
-    driver = webdriver.Chrome(options=options)
+    return webdriver.Chrome(options=options)
+
+
+def login(driver, user_id, user_pw):
+    print("★★★★★ 로그인 시작 ★★★★★", flush=True)
+
+    start = time.perf_counter()
+    wait = WebDriverWait(driver, 5)
+
+    driver.get(LOGIN_URL)
+
+    id_input = wait.until(
+        EC.visibility_of_element_located(
+            (By.NAME, "user_id"),
+        )
+    )
+    id_input.clear()
+    id_input.send_keys(user_id)
+
+    pw_input = wait.until(
+        EC.visibility_of_element_located(
+            (By.NAME, "pw"),
+        )
+    )
+    pw_input.clear()
+    pw_input.send_keys(user_pw)
+
+    login_button = wait.until(
+        EC.element_to_be_clickable(
+            (By.CSS_SELECTOR, "button[type='submit']"),
+        )
+    )
+    login_button.click()
+
+    wait.until(EC.url_changes(LOGIN_URL))
+
+    print(
+        f"[시간] 로그인 : {time.perf_counter() - start:.2f}초",
+        flush=True,
+    )
+
+
+def modify_post(driver, modify_url, text):
+    print("★★★★★ 게시글 수정 시작 ★★★★★", flush=True)
+
+    start = time.perf_counter()
+    t = time.perf_counter()
 
     wait = WebDriverWait(driver, 5)
     short_wait = WebDriverWait(driver, 20)
 
     try:
-        # ============================================
-        # 로그인
-        # ============================================
-        driver.get(LOGIN_URL)
-
-        id_input = wait.until(
-            EC.visibility_of_element_located(
-                (By.NAME, "user_id"),
-            )
-        )
-        id_input.clear()
-        id_input.send_keys(user_id)
-
-        pw_input = wait.until(
-            EC.visibility_of_element_located(
-                (By.NAME, "pw"),
-            )
-        )
-        pw_input.clear()
-        pw_input.send_keys(user_pw)
-
-        login_button = wait.until(
-            EC.element_to_be_clickable(
-                (By.CSS_SELECTOR, "button[type='submit']"),
-            )
-        )
-        login_button.click()
-
-        wait.until(EC.url_changes(LOGIN_URL))
-
-        print(f"[시간] 로그인 : {time.perf_counter() - t:.2f}초", flush=True)
-        t = time.perf_counter()
-
         # ============================================
         # 수정 페이지 이동
         # ============================================
@@ -101,7 +110,10 @@ def modify_post(user_id, user_pw, modify_url, text):
             )
         )
 
-        print(f"[시간] 수정페이지 : {time.perf_counter() - t:.2f}초", flush=True)
+        print(
+            f"[시간] 수정페이지 : {time.perf_counter() - t:.2f}초",
+            flush=True,
+        )
         t = time.perf_counter()
 
         # ============================================
@@ -124,7 +136,7 @@ def modify_post(user_id, user_pw, modify_url, text):
                 (By.CSS_SELECTOR, ".note-editable"),
             )
         )
-        
+
         # 비운 본문의 맨 끝에서 입력을 시작한다.
         editor.click()
         editor.send_keys(Keys.CONTROL, Keys.END)
@@ -150,8 +162,7 @@ def modify_post(user_id, user_pw, modify_url, text):
                 print("URL 발견 - OG 카드 생성 시작", flush=True)
 
                 # 이미 존재하는 OG 카드 수를 기록한다.
-                # 단순히 .og-div의 존재만 기다리면 두 번째 URL부터는
-                # 기존 카드 때문에 즉시 통과하는 문제가 생긴다.
+                # 두 번째 URL부터 기존 카드 때문에 즉시 통과하는 문제 방지
                 og_count_before = len(
                     driver.find_elements(By.CSS_SELECTOR, ".og-div")
                 )
@@ -166,27 +177,24 @@ def modify_post(user_id, user_pw, modify_url, text):
                         ) > og_count_before
                     )
                 except Exception:
-                    # OG 카드가 생성되지 않았을 때 상태를 로그에 남긴다.
                     current_og_count = len(
                         driver.find_elements(By.CSS_SELECTOR, ".og-div")
                     )
-                
+
                     print(
                         f"OG 카드 생성 실패: 기존 {og_count_before}개 / "
                         f"현재 {current_og_count}개",
                         flush=True,
                     )
-                
+
                     print("===== OG 생성 실패 시점 HTML =====", flush=True)
                     print(editor.get_attribute("innerHTML"), flush=True)
-                
+
                     raise
 
                 print("OG 생성 완료", flush=True)
 
-                # OG 카드 뒤에는 일반 모드에서 커서가 안정적으로 놓이지
-                # 않을 수 있다. HTML 모드에서 다음 내용을 위한 빈 문단을
-                # 직접 추가한 뒤 다시 일반 에디터 모드로 돌아온다.
+                # OG 카드 뒤에 다음 내용이 있다면 빈 문단을 추가한다.
                 if not is_last_line:
                     html_button.click()
 
@@ -217,21 +225,22 @@ def modify_post(user_id, user_pw, modify_url, text):
                             (By.CSS_SELECTOR, ".note-editable"),
                         )
                     )
-                    
-                    # HTML 모드 전환 후에도 다음 빈 문단의 끝에서 계속 입력한다.
+
+                    # HTML 모드 전환 후에도 다음 빈 문단의 끝에서 입력한다.
                     editor.click()
                     editor.send_keys(Keys.CONTROL, Keys.END)
 
-                # URL 뒤에는 별도의 Enter를 보내지 않는다.
-                # 위에서 추가한 <p><br></p>가 다음 입력 위치를 만든다.
+                # URL 뒤에는 Enter를 보내지 않는다.
                 continue
 
-            # 일반 텍스트와 빈 줄은 다음 줄로 이동한다.
-            # 마지막 줄 뒤에는 불필요한 줄바꿈을 넣지 않는다.
+            # 일반 텍스트와 빈 줄은 다음 줄로 이동
             if not is_last_line:
                 editor.send_keys(Keys.ENTER)
 
-        print(f"[시간] 본문입력 : {time.perf_counter() - t:.2f}초", flush=True)
+        print(
+            f"[시간] 본문입력 : {time.perf_counter() - t:.2f}초",
+            flush=True,
+        )
         t = time.perf_counter()
 
         # ============================================
@@ -248,7 +257,7 @@ def modify_post(user_id, user_pw, modify_url, text):
         print("===== 저장 직전 HTML =====", flush=True)
         print(html_area.get_attribute("value"), flush=True)
 
-        # 저장 전 일반 에디터 모드로 복귀하여 HTML 변경 내용을 확정한다.
+        # 저장 전 일반 에디터 모드로 복귀
         html_button.click()
 
         wait.until(
@@ -267,7 +276,10 @@ def modify_post(user_id, user_pw, modify_url, text):
         )
         write_button.click()
 
-        print(f"[시간] 저장 : {time.perf_counter() - t:.2f}초", flush=True)
+        print(
+            f"[시간] 저장 : {time.perf_counter() - t:.2f}초",
+            flush=True,
+        )
 
         return {
             "success": True,
@@ -284,6 +296,7 @@ def modify_post(user_id, user_pw, modify_url, text):
     finally:
         elapsed = time.perf_counter() - start
 
-        print(f"[modify_post] 실행시간: {elapsed:.2f}초", flush=True)
-
-        driver.quit()
+        print(
+            f"[게시글 수정] 실행시간: {elapsed:.2f}초",
+            flush=True,
+        )
