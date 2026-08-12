@@ -21,6 +21,8 @@ from gumsa import extract_links
 
 
 START_ROW = 5
+NAME_COLUMN = 2  # B열
+LINK_COLUMN = 3  # C열
 URL_COLUMN = 7  # G열
 DEFAULT_SPREADSHEET_ID = "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
 
@@ -48,6 +50,55 @@ def result_value(result) -> str:
     return str(result)
 
 
+def select_targets(b_values, c_values, g_values):
+    """연속된 같은 B열 그룹에서 C열 값이 3개 이상인 G열 URL만 선별한다."""
+    last_row_count = max(len(b_values), len(c_values), len(g_values))
+    targets = []
+    index = START_ROW - 1
+
+    while index < last_row_count:
+        name = b_values[index].strip() if index < len(b_values) else ""
+
+        # B열이 비어 있으면 그룹으로 처리하지 않고 다음 행으로 넘어간다.
+        if not name:
+            index += 1
+            continue
+
+        # 같은 B열 값이 연속되는 범위를 하나의 그룹으로 찾는다.
+        group_end = index + 1
+        while group_end < last_row_count:
+            next_name = (
+                b_values[group_end].strip()
+                if group_end < len(b_values)
+                else ""
+            )
+            if next_name != name:
+                break
+            group_end += 1
+
+        # 그룹 내부에서 C열이 비어 있지 않은 값의 개수를 센다.
+        link_count = sum(
+            1
+            for row_index in range(index, group_end)
+            if row_index < len(c_values) and c_values[row_index].strip()
+        )
+
+        # C열 링크가 3개 이상인 그룹의 G열 URL만 처리 대상으로 추가한다.
+        if link_count >= 3:
+            for row_index in range(index, group_end):
+                url = (
+                    g_values[row_index].strip()
+                    if row_index < len(g_values)
+                    else ""
+                )
+                if url:
+                    targets.append((row_index + 1, url))
+
+        index = group_end
+
+    return targets
+
+
 def main():
     started_at = time.time()
 
@@ -59,13 +110,11 @@ def main():
         os.getenv("SPREADSHEET_ID", DEFAULT_SPREADSHEET_ID)
     ).worksheet(os.environ["TARGET_SHEET"])
 
-    # G열을 읽고, 5행 이후에서 URL이 있는 행만 선별한다.
+    # B/C/G열을 읽어, B열의 연속 그룹별 C열 링크 개수로 처리 대상을 선별한다.
+    b_values = worksheet.col_values(NAME_COLUMN)
+    c_values = worksheet.col_values(LINK_COLUMN)
     g_values = worksheet.col_values(URL_COLUMN)
-    targets = [
-        (row, value.strip())
-        for row, value in enumerate(g_values[START_ROW - 1 :], start=START_ROW)
-        if value.strip()
-    ]
+    targets = select_targets(b_values, c_values, g_values)
 
     print(f"처리 대상: {len(targets)}개")
     if not targets:
