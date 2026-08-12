@@ -25,7 +25,7 @@ START_ROW = 5
 NAME_COLUMN = 2  # B열: 그룹 시작 이름
 LINK_COLUMN = 3  # C열: 개별 링크
 URL_COLUMN = 7  # G열: 모음집 링크
-DEFAULT_SPREADSHEET_ID = "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
+DEFAULT_SPREADSHEET_ID = "13Hp2IqBFzHE5L4xqGpieu-GVu0mA79fV06xYuFfnSB0"
 
 
 def process_url(row: int, url: str):
