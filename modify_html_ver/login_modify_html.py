@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import traceback
 
+
 LOGIN_URL = (
     "https://sign.dcinside.com/login"
     "?s_url=https://www.dcinside.com/"
@@ -98,7 +99,11 @@ def modify_post(
             EC.url_changes(LOGIN_URL)
         )
 
-        print(f"[시간] 로그인 : {time.perf_counter()-t:.2f}초", flush=True)
+        print(
+            f"[시간] 로그인 : {time.perf_counter()-t:.2f}초",
+            flush=True
+        )
+
         t = time.perf_counter()
 
         # ============================================
@@ -120,7 +125,11 @@ def modify_post(
             )
         )
 
-        print(f"[시간] 수정페이지 : {time.perf_counter()-t:.2f}초", flush=True)
+        print(
+            f"[시간] 수정페이지 : {time.perf_counter()-t:.2f}초",
+            flush=True
+        )
+
         t = time.perf_counter()
 
         html_button.click()
@@ -138,10 +147,62 @@ def modify_post(
             )
         )
 
-        html_area.clear()
-        html_area.send_keys(html)
+        # HTML 크기 출력
+        html_size_kb = len(html.encode("utf-8")) / 1024
 
-        print(f"[시간] 본문입력 : {time.perf_counter()-t:.2f}초", flush=True)
+        print(
+            f"[HTML] 길이 : {len(html):,}자 / "
+            f"UTF-8 크기 : {html_size_kb:,.1f} KB",
+            flush=True
+        )
+
+        # ============================================
+        # send_keys() 대신 JavaScript로 직접 주입
+        # ============================================
+
+        driver.execute_script(
+            """
+            arguments[0].value = arguments[1];
+
+            arguments[0].dispatchEvent(
+                new Event('input', { bubbles: true })
+            );
+
+            arguments[0].dispatchEvent(
+                new Event('change', { bubbles: true })
+            );
+            """,
+            html_area,
+            html
+        )
+
+        # ============================================
+        # 실제 입력 결과 확인
+        # ============================================
+
+        actual_length = driver.execute_script(
+            "return arguments[0].value.length;",
+            html_area
+        )
+
+        print(
+            f"[HTML] 원본={len(html):,}자 / "
+            f"입력={actual_length:,}자",
+            flush=True
+        )
+
+        if actual_length != len(html):
+            raise RuntimeError(
+                f"HTML 입력 불일치: "
+                f"원본 {len(html):,}자 / "
+                f"입력 {actual_length:,}자"
+            )
+
+        print(
+            f"[시간] 본문입력 : {time.perf_counter()-t:.2f}초",
+            flush=True
+        )
+
         t = time.perf_counter()
 
         # ============================================
@@ -159,7 +220,10 @@ def modify_post(
 
         write_button.click()
 
-        print(f"[시간] 저장 : {time.perf_counter()-t:.2f}초", flush=True)
+        print(
+            f"[시간] 저장 : {time.perf_counter()-t:.2f}초",
+            flush=True
+        )
 
         return {
             "success": True
@@ -179,7 +243,8 @@ def modify_post(
         elapsed = time.perf_counter() - start
 
         print(
-            f"[modify_post] 실행시간: {elapsed:.2f}초"
+            f"[modify_post] 실행시간: {elapsed:.2f}초",
+            flush=True
         )
 
         driver.quit()
