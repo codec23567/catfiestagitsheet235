@@ -1,0 +1,31 @@
+name: link crw
+
+on:
+  workflow_dispatch:
+    inputs:
+      sheet_name:
+        description: "Target sheet"
+        required: true
+        type: string
+
+jobs:
+ test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install packages
+        run: pip install -r requirements.txt
+
+      - name: Run Python
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
+        run: python modify_normal_bl_ver/gumsa
