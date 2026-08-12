@@ -21,9 +21,9 @@ from gumsa import extract_links
 
 
 START_ROW = 5
-NAME_COLUMN = 2  # B열
-LINK_COLUMN = 3  # C열
-URL_COLUMN = 7  # G열
+NAME_COLUMN = 2  # B열: 그룹 시작 이름
+LINK_COLUMN = 3  # C열: 개별 링크
+URL_COLUMN = 7  # G열: 모음집 링크
 DEFAULT_SPREADSHEET_ID = "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
 
 
@@ -51,50 +51,53 @@ def result_value(result) -> str:
 
 
 def select_targets(b_values, c_values, g_values):
-    """연속된 같은 B열 그룹에서 C열 값이 3개 이상인 G열 URL만 선별한다."""
+    """B열의 이름 행부터 다음 이름 직전까지를 그룹으로 묶어 처리 대상을 선별한다."""
     last_row_count = max(len(b_values), len(c_values), len(g_values))
     targets = []
-    index = START_ROW - 1
+    group_start = START_ROW - 1
 
-    while index < last_row_count:
-        name = b_values[index].strip() if index < len(b_values) else ""
+    while group_start < last_row_count:
+        group_name = (
+            b_values[group_start].strip()
+            if group_start < len(b_values)
+            else ""
+        )
 
-        # B열이 비어 있으면 그룹으로 처리하지 않고 다음 행으로 넘어간다.
-        if not name:
-            index += 1
+        # B열이 비어 있는 행은 이전 그룹에 포함되므로, 단독 그룹으로 처리하지 않는다.
+        if not group_name:
+            group_start += 1
             continue
 
-        # 같은 B열 값이 연속되는 범위를 하나의 그룹으로 찾는다.
-        group_end = index + 1
+        # 다음 B열 이름이 나오기 직전까지를 현재 그룹으로 잡는다.
+        group_end = group_start + 1
         while group_end < last_row_count:
             next_name = (
                 b_values[group_end].strip()
                 if group_end < len(b_values)
                 else ""
             )
-            if next_name != name:
+            if next_name:
                 break
             group_end += 1
 
-        # 그룹 내부에서 C열이 비어 있지 않은 값의 개수를 센다.
+        # 현재 그룹 범위 전체에서 C열의 비어 있지 않은 링크를 센다.
         link_count = sum(
             1
-            for row_index in range(index, group_end)
+            for row_index in range(group_start, group_end)
             if row_index < len(c_values) and c_values[row_index].strip()
         )
 
-        # C열 링크가 3개 이상인 그룹의 G열 URL만 처리 대상으로 추가한다.
-        if link_count >= 3:
-            for row_index in range(index, group_end):
-                url = (
-                    g_values[row_index].strip()
-                    if row_index < len(g_values)
-                    else ""
-                )
-                if url:
-                    targets.append((row_index + 1, url))
+        # 모음집 링크는 그룹 시작 행의 G열에만 있다고 보고 처리한다.
+        group_url = (
+            g_values[group_start].strip()
+            if group_start < len(g_values)
+            else ""
+        )
 
-        index = group_end
+        if link_count >= 3 and group_url:
+            targets.append((group_start + 1, group_url))
+
+        group_start = group_end
 
     return targets
 
@@ -110,7 +113,7 @@ def main():
         os.getenv("SPREADSHEET_ID", DEFAULT_SPREADSHEET_ID)
     ).worksheet(os.environ["TARGET_SHEET"])
 
-    # B/C/G열을 읽어, B열의 연속 그룹별 C열 링크 개수로 처리 대상을 선별한다.
+    # B열의 그룹과 C열 링크 개수를 기준으로 G열 URL 처리 대상을 선별한다.
     b_values = worksheet.col_values(NAME_COLUMN)
     c_values = worksheet.col_values(LINK_COLUMN)
     g_values = worksheet.col_values(URL_COLUMN)
@@ -139,7 +142,7 @@ def main():
             print(f"완료 | {row}행 | {url} | {result}")
             completed_results.append((row, result_value(result)))
 
-    # 결과는 원본 URL이 있는 행의 L열에 기록한다.
+    # 결과는 모음집 링크가 있던 그룹 시작 행의 L열에 기록한다.
     for row, value in completed_results:
         worksheet.update(range_name=f"L{row}", values=[[value]])
 
