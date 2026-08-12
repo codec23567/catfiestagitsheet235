@@ -25,7 +25,7 @@ gc = gspread.authorize(credentials)
 
 # 작업할 스프레드시트 열기
 spreadsheet = gc.open_by_key(
-    "1_4rB1Tk248VBqkMT6MhywlV-_m0hitwWv2MkiQ9hzAU"
+    "13Hp2IqBFzHE5L4xqGpieu-GVu0mA79fV06xYuFfnSB0"
 )
 
 worksheet = spreadsheet.worksheet(
