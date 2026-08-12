@@ -32,12 +32,12 @@ def process_url(row: int, url: str):
     """행 번호를 보존한 채 gumsa.extract_links를 실행한다."""
     try:
         return row, url, extract_links(url), None
-    except Exception as error:  # 한 URL 실패가 전체 실행을 멈추지 않게 함
+    except Exception as error:
         return row, url, None, error
 
 
 def result_links(result) -> list[str]:
-    """extract_links 결과를 링크 목록으로 정리한다."""
+    """extract_links 결과를 비교 가능한 링크 목록으로 정리한다."""
     if result is None:
         return []
 
@@ -61,12 +61,12 @@ def select_targets(b_values, c_values, g_values):
             else ""
         )
 
-        # B열이 빈 행은 이전 그룹에 속하므로 시작점으로 처리하지 않는다.
+        # B열이 빈 행은 이전 그룹에 포함되므로 그룹 시작점으로 처리하지 않는다.
         if not group_name:
             group_start += 1
             continue
 
-        # 다음 B열 이름 직전까지를 하나의 그룹으로 잡는다.
+        # 다음 B열 이름이 나오기 직전까지를 하나의 그룹으로 잡는다.
         group_end = group_start + 1
         while group_end < last_row_count:
             next_name = (
@@ -78,7 +78,7 @@ def select_targets(b_values, c_values, g_values):
                 break
             group_end += 1
 
-        # 그룹 전체의 C열 링크를 수집한다.
+        # 그룹 전체 C열의 비어 있지 않은 링크를 모은다.
         c_links = [
             c_values[row_index].strip()
             for row_index in range(group_start, group_end)
@@ -92,7 +92,7 @@ def select_targets(b_values, c_values, g_values):
             else ""
         )
 
-        # C열 링크가 3개 이상이고 G열 모음집 링크가 있을 때만 처리한다.
+        # C열 링크가 3개 이상이고, G열 모음집 링크가 있을 때만 처리한다.
         if len(c_links) >= 3 and group_url:
             targets.append(
                 {
@@ -118,6 +118,7 @@ def main():
         os.getenv("SPREADSHEET_ID", DEFAULT_SPREADSHEET_ID)
     ).worksheet(os.environ["TARGET_SHEET"])
 
+    # B열 그룹과 C열 링크 수를 기준으로 G열 조사 대상을 선정한다.
     b_values = worksheet.col_values(NAME_COLUMN)
     c_values = worksheet.col_values(LINK_COLUMN)
     g_values = worksheet.col_values(URL_COLUMN)
@@ -130,7 +131,7 @@ def main():
     max_workers = int(os.getenv("MAX_WORKERS", "20"))
     succeeded = 0
     failed = 0
-    completed_rows = []
+    status_updates = []
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
@@ -150,19 +151,20 @@ def main():
             succeeded += 1
             extracted_links = result_links(result)
 
-            # 순서와 중복 여부를 무시하지 않고, 링크 구성이 완전히 같은지 비교한다.
+            # 순서와 중복 개수까지 포함해 C열 링크와 조사 결과를 비교한다.
             if Counter(extracted_links) == Counter(target["c_links"]):
-                completed_rows.append(row)
-                print(f"완료 | {row}행 | C열 링크와 결과가 일치")
+                status_updates.append((row, "작업 완료"))
+                print(f"작업 완료 | {row}행 | C열 링크와 결과가 일치")
             else:
+                status_updates.append((row, "불일치"))
                 print(
                     f"불일치 | {row}행 | "
                     f"C열 {len(target['c_links'])}개 / 결과 {len(extracted_links)}개"
                 )
 
-    # G열의 조사 URL 바로 아래 셀에 완료 상태를 기록한다.
-    for row in completed_rows:
-        worksheet.update(range_name=f"G{row + 1}", values=[["작업 완료"]])
+    # G열의 조사 링크 바로 아래 행에 비교 결과를 기록한다.
+    for row, status in status_updates:
+        worksheet.update(range_name=f"G{row + 1}", values=[[status]])
 
     elapsed = time.time() - started_at
     print(f"완료: 성공 {succeeded}개, 실패 {failed}개, 소요 {elapsed:.2f}초")
