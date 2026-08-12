@@ -1,10 +1,38 @@
 import os
 import json
+import re
 
 import gspread
 from google.oauth2.service_account import Credentials
 
 from login_modify_html import modify_post
+
+
+# -------------------------------------------------
+# 모바일 게시글 URL → PC 수정 URL 변환
+# -------------------------------------------------
+
+def to_modify_url(url):
+    url = str(url or "").strip()
+
+    # 모바일 게시글 URL
+    # https://m.dcinside.com/board/catfiesta/58
+    match = re.fullmatch(
+        r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
+        url,
+    )
+
+    if match:
+        gallery_id = match.group(1)
+        post_no = match.group(2)
+
+        return (
+            "https://gall.dcinside.com/mgallery/board/modify/"
+            f"?id={gallery_id}&no={post_no}"
+        )
+
+    # 이미 PC 수정 URL인 경우 등은 그대로 사용
+    return url
 
 
 # -------------------------------------------------
@@ -60,6 +88,15 @@ if not modify_url:
 
 
 # -------------------------------------------------
+# 수정 URL 변환
+# -------------------------------------------------
+
+modify_url = to_modify_url(modify_url)
+
+print(f"수정 URL: {modify_url}")
+
+
+# -------------------------------------------------
 # 게시글 수정
 # -------------------------------------------------
 
@@ -94,4 +131,3 @@ else:
     )
 
     print(f"실패 : {message}")
- 
