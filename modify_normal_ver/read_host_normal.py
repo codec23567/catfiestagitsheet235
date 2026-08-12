@@ -47,6 +47,21 @@ modify_url = worksheet.acell("M3").value
 
 if modify_url:
     modify_url = modify_url.strip()
+
+    # 모바일 게시글 URL을 PC 수정 URL로 변환
+    match = re.fullmatch(
+        r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
+        modify_url
+    )
+
+    if match:
+        gallery_id = match.group(1)
+        post_no = match.group(2)
+
+        modify_url = (
+            "https://gall.dcinside.com/mgallery/board/modify/"
+            f"?id={gallery_id}&no={post_no}"
+        )
 else:
     modify_url = ""
 
