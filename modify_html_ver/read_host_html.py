@@ -1,6 +1,8 @@
 import os
 import json
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -68,6 +70,18 @@ user_pw = os.environ["CAT_PW"]
 
 
 # -------------------------------------------------
+# 실행 상태 기록
+# -------------------------------------------------
+
+worksheet.update(
+    range_name="I9",
+    values=[["실행중"]]
+)
+
+print("실행중")
+
+
+# -------------------------------------------------
 # 시트 데이터 읽기
 # -------------------------------------------------
 
@@ -114,12 +128,22 @@ result = modify_post(
 
 if result["success"]:
 
+    # 한국 시간 기준 완료 시각
+    completed_at = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).strftime("%Y-%m-%d %H:%M:%S")
+
     worksheet.update(
         range_name="I9",
         values=[["완료"]]
     )
 
-    print("완료")
+    worksheet.update(
+        range_name="I10",
+        values=[[completed_at]]
+    )
+
+    print(f"완료 : {completed_at}")
 
 else:
 
