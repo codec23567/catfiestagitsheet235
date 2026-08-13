@@ -131,7 +131,7 @@ if result["success"]:
     # 한국 시간 기준 완료 시각
     completed_at = datetime.now(
         ZoneInfo("Asia/Seoul")
-    ).strftime("%Y-%m-%d %H:%M:%S")
+    ).strftime("%m/%d %H:%M:%S")
 
     worksheet.update(
         range_name="I9",
