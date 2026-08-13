@@ -1,6 +1,8 @@
 import json
 import os
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -157,19 +159,32 @@ try:
             text,
         )
 
-        # 성공한 경우에만 상태 셀을 작업완료로 변경
+        # 성공한 경우에만 상태 셀과 완료 시각을 변경
         if result.get("success", False):
+
+            # 한국 시간 기준 완료 시각
+            completed_at = datetime.now(
+                ZoneInfo("Asia/Seoul")
+            ).strftime("%-m/%-d %H:%M")
+
+            # G열: 작업완료
             worksheet.update(
                 range_name=f"G{status_row}",
                 values=[["작업완료"]],
             )
 
+            # H열: 완료 시각
+            worksheet.update(
+                range_name=f"H{status_row}",
+                values=[[completed_at]],
+            )
+
             print(
-                f"G{status_row}: 작업완료",
+                f"G{status_row}: 작업완료 / {completed_at}",
                 flush=True,
             )
 
-        # 실패하면 불일치 상태를 그대로 둠
+        # 실패하면 불일치 상태와 기존 H열 값을 그대로 둠
         else:
             message = result.get(
                 "message",
