@@ -153,6 +153,17 @@ try:
         )
         print(f"수정 URL: {modify_url}", flush=True)
 
+        # 작업 시작 상태
+        worksheet.update(
+            range_name=f"G{status_row}",
+            values=[["실행중"]],
+        )
+
+        print(
+            f"G{status_row}: 실행중",
+            flush=True,
+        )
+
         result = modify_post(
             driver,
             modify_url,
@@ -173,9 +184,9 @@ try:
                 values=[["작업완료"]],
             )
 
-            # H열: 완료 시각
+            # 작업완료 바로 아래 셀: 완료 시각
             worksheet.update(
-                range_name=f"H{status_row}",
+                range_name=f"G{status_row + 1}",
                 values=[[completed_at]],
             )
 
@@ -184,11 +195,17 @@ try:
                 flush=True,
             )
 
-        # 실패하면 불일치 상태와 기존 H열 값을 그대로 둠
+        # 실패하면 불일치 상태를 그대로 둠
         else:
             message = result.get(
                 "message",
                 "알 수 없는 오류",
+            )
+
+            # 실패 시 다시 불일치로 유지
+            worksheet.update(
+                range_name=f"G{status_row}",
+                values=[["불일치"]],
             )
 
             print(
