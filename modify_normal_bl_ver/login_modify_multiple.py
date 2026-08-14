@@ -126,6 +126,7 @@ def modify_post(driver, modify_url, text):
                 (By.CSS_SELECTOR, ".note-codable"),
             )
         )
+
         html_area.clear()
 
         # 일반 에디터 모드로 복귀
@@ -137,7 +138,7 @@ def modify_post(driver, modify_url, text):
             )
         )
 
-        # 비운 본문의 맨 끝에서 입력을 시작한다.
+        # 에디터 맨 끝으로 이동
         editor.click()
         editor.send_keys(Keys.CONTROL, Keys.END)
 
@@ -154,48 +155,15 @@ def modify_post(driver, modify_url, text):
 
             print(f"입력: [{line}]", flush=True)
 
-            # 빈 줄은 텍스트를 입력하지 않고 Enter만 처리
-            if line:
-                editor.send_keys(line)
+            # ==================================================
+            # ① URL이 아닌 일반 텍스트
+            # ==================================================
+            if not is_url:
 
-            if is_url:
-                print("URL 발견 - OG 카드 생성 시작", flush=True)
-
-                # 이미 존재하는 OG 카드 수를 기록한다.
-                # 두 번째 URL부터 기존 카드 때문에 즉시 통과하는 문제 방지
-                og_count_before = len(
-                    driver.find_elements(By.CSS_SELECTOR, ".og-div")
-                )
-
-                driver.execute_script("oglink('paste', false, '');")
-
-                # 새 OG 카드가 실제로 하나 추가될 때까지 대기
-                try:
-                    short_wait.until(
-                        lambda d: len(
-                            d.find_elements(By.CSS_SELECTOR, ".og-div")
-                        ) > og_count_before
-                    )
-                except Exception:
-                    current_og_count = len(
-                        driver.find_elements(By.CSS_SELECTOR, ".og-div")
-                    )
-
-                    print(
-                        f"OG 카드 생성 실패: 기존 {og_count_before}개 / "
-                        f"현재 {current_og_count}개",
-                        flush=True,
-                    )
-
-                    print("===== OG 생성 실패 시점 HTML =====", flush=True)
-                    print(editor.get_attribute("innerHTML"), flush=True)
-
-                    raise
-
-                print("OG 생성 완료", flush=True)
-
-                # OG 카드 뒤에 다음 내용이 있다면 빈 문단을 추가한다.
-                if not is_last_line:
+                # ----------------------------------------------
+                # 빈 줄
+                # ----------------------------------------------
+                if not line:
                     html_button.click()
 
                     html_area = wait.until(
@@ -207,10 +175,13 @@ def modify_post(driver, modify_url, text):
                     driver.execute_script(
                         """
                         const area = arguments[0];
+
                         area.value += '<p><br></p>';
+
                         area.dispatchEvent(
                             new Event('input', { bubbles: true })
                         );
+
                         area.dispatchEvent(
                             new Event('change', { bubbles: true })
                         );
@@ -226,19 +197,185 @@ def modify_post(driver, modify_url, text):
                         )
                     )
 
-                    # HTML 모드 전환 후에도 다음 빈 문단의 끝에서 입력한다.
                     editor.click()
                     editor.send_keys(Keys.CONTROL, Keys.END)
 
-                # URL 뒤에는 Enter를 보내지 않는다.
+                # ----------------------------------------------
+                # 일반 텍스트
+                # 22pt + Bold
+                # ----------------------------------------------
+                else:
+                    # HTML 특수문자 안전 처리
+                    escaped_line = html.escape(line)
+
+                    styled_html = (
+                        '<p>'
+                        '<span style="font-size: 22pt; '
+                        'font-weight: 700;">'
+                        f'{escaped_line}'
+                        '</span>'
+                        '</p>'
+                    )
+
+                    # HTML 모드로 전환
+                    html_button.click()
+
+                    html_area = wait.until(
+                        EC.visibility_of_element_located(
+                            (By.CSS_SELECTOR, ".note-codable"),
+                        )
+                    )
+
+                    # 기존 HTML 맨 뒤에 일반 텍스트를 HTML로 추가
+                    driver.execute_script(
+                        """
+                        const area = arguments[0];
+                        const html = arguments[1];
+
+                        area.value += html;
+
+                        area.dispatchEvent(
+                            new Event('input', { bubbles: true })
+                        );
+
+                        area.dispatchEvent(
+                            new Event('change', { bubbles: true })
+                        );
+                        """,
+                        html_area,
+                        styled_html,
+                    )
+
+                    # 일반 에디터 모드로 복귀
+                    html_button.click()
+
+                    editor = wait.until(
+                        EC.visibility_of_element_located(
+                            (By.CSS_SELECTOR, ".note-editable"),
+                        )
+                    )
+
+                    # HTML 삽입 후에도 반드시 맨 끝으로 이동
+                    editor.click()
+                    editor.send_keys(Keys.CONTROL, Keys.END)
+
                 continue
 
-            # 일반 텍스트와 빈 줄은 다음 줄로 이동
+            # ==================================================
+            # ② URL
+            # ==================================================
+            print("URL 발견 - OG 카드 생성 시작", flush=True)
+
+            # 현재 OG 카드 개수 기록
+            og_count_before = len(
+                driver.find_elements(
+                    By.CSS_SELECTOR,
+                    ".og-div",
+                )
+            )
+
+            # ----------------------------------------------
+            # URL은 기존처럼 일반 에디터에서 입력
+            # ----------------------------------------------
+            editor.click()
+            editor.send_keys(line)
+
+            # OG 카드 생성
+            driver.execute_script(
+                "oglink('paste', false, '');"
+            )
+
+            # ----------------------------------------------
+            # 새로운 OG 카드가 실제로 추가될 때까지 대기
+            # ----------------------------------------------
+            try:
+                short_wait.until(
+                    lambda d: len(
+                        d.find_elements(
+                            By.CSS_SELECTOR,
+                            ".og-div",
+                        )
+                    ) > og_count_before
+                )
+
+            except Exception:
+                current_og_count = len(
+                    driver.find_elements(
+                        By.CSS_SELECTOR,
+                        ".og-div",
+                    )
+                )
+
+                print(
+                    f"OG 카드 생성 실패: "
+                    f"기존 {og_count_before}개 / "
+                    f"현재 {current_og_count}개",
+                    flush=True,
+                )
+
+                print(
+                    "===== OG 생성 실패 시점 HTML =====",
+                    flush=True,
+                )
+
+                print(
+                    editor.get_attribute("innerHTML"),
+                    flush=True,
+                )
+
+                raise
+
+            print("OG 생성 완료", flush=True)
+
+            # ==================================================
+            # URL 뒤에 다음 내용이 있으면 빈 문단 추가
+            # ==================================================
             if not is_last_line:
-                editor.send_keys(Keys.ENTER)
+
+                html_button.click()
+
+                html_area = wait.until(
+                    EC.visibility_of_element_located(
+                        (By.CSS_SELECTOR, ".note-codable"),
+                    )
+                )
+
+                driver.execute_script(
+                    """
+                    const area = arguments[0];
+
+                    area.value += '<p><br></p>';
+
+                    area.dispatchEvent(
+                        new Event('input', { bubbles: true })
+                    );
+
+                    area.dispatchEvent(
+                        new Event('change', { bubbles: true })
+                    );
+                    """,
+                    html_area,
+                )
+
+                html_button.click()
+
+                editor = wait.until(
+                    EC.visibility_of_element_located(
+                        (By.CSS_SELECTOR, ".note-editable"),
+                    )
+                )
+
+                # HTML 모드에서 빠져나온 후
+                # 다음 입력 위치를 확실하게 맨 끝으로 이동
+                editor.click()
+                editor.send_keys(Keys.CONTROL, Keys.END)
+
+            # URL 뒤에는 Enter를 보내지 않음
+            continue
 
         print(
-            f"[시간] 본문입력 : {time.perf_counter() - t:.2f}초",
+            f"[시간] 본문입력 : "
+            f"{time.perf_counter() - t:.2f}초",
             flush=True,
         )
         t = time.perf_counter()
@@ -254,8 +391,15 @@ def modify_post(driver, modify_url, text):
             )
         )
 
-        print("===== 저장 직전 HTML =====", flush=True)
-        print(html_area.get_attribute("value"), flush=True)
+        print(
+            "===== 저장 직전 HTML =====",
+            flush=True,
+        )
+
+        print(
+            html_area.get_attribute("value"),
+            flush=True,
+        )
 
         # 저장 전 일반 에디터 모드로 복귀
         html_button.click()
@@ -274,10 +418,12 @@ def modify_post(driver, modify_url, text):
                 (By.CSS_SELECTOR, "button.btn_blue.write"),
             )
         )
+
         write_button.click()
 
         print(
-            f"[시간] 저장 : {time.perf_counter() - t:.2f}초",
+            f"[시간] 저장 : "
+            f"{time.perf_counter() - t:.2f}초",
             flush=True,
         )
 
@@ -297,6 +443,7 @@ def modify_post(driver, modify_url, text):
         elapsed = time.perf_counter() - start
 
         print(
-            f"[게시글 수정] 실행시간: {elapsed:.2f}초",
+            f"[게시글 수정] 실행시간: "
+            f"{elapsed:.2f}초",
             flush=True,
         )
