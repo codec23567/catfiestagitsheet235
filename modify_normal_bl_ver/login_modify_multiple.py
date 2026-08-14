@@ -8,7 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 import re
 import time
 import traceback
-
+import html
 
 LOGIN_URL = (
     "https://sign.dcinside.com/login"
