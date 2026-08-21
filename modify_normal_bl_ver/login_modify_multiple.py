@@ -419,7 +419,68 @@ def modify_post(driver, modify_url, text):
             )
         )
 
+        before_url = driver.current_url
+        print(f"[클릭 전 URL] {before_url}", flush=True)
+
         write_button.click()
+
+        # ============================================
+        # 저장 버튼 클릭 직후 상태 확인
+        # ============================================
+
+        # --------------------------------------------
+        # 1) 브라우저 네이티브 alert(경고창) 발생 여부 확인
+        # --------------------------------------------
+        try:
+            alert = WebDriverWait(driver, 3).until(
+                EC.alert_is_present()
+            )
+            alert_text = alert.text
+            print(f"[경고창 감지] {alert_text}", flush=True)
+            alert.accept()
+
+        except Exception:
+            print("[경고창 없음]", flush=True)
+
+        # --------------------------------------------
+        # 2) URL 변경 여부 확인 (저장 성공 시 상세 페이지로 이동)
+        # --------------------------------------------
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.url_changes(before_url)
+            )
+
+            print(
+                f"[클릭 후 URL 변경됨] {driver.current_url}",
+                flush=True,
+            )
+
+        except Exception:
+            print(
+                f"[URL 변경 없음] 현재 URL: {driver.current_url}",
+                flush=True,
+            )
+
+            # --------------------------------------------
+            # 3) URL이 안 바뀐 경우, 페이지 내 에러 메시지 확인
+            #    (실제 마크업에 맞게 선택자 조정 필요)
+            # --------------------------------------------
+            error_elements = driver.find_elements(
+                By.CSS_SELECTOR,
+                ".error_msg, .alert_msg, .layer_error",
+            )
+
+            if error_elements:
+                for el in error_elements:
+                    print(f"[에러 메시지 감지] {el.text}", flush=True)
+            else:
+                print("[에러 메시지 요소 없음]", flush=True)
+
+        # --------------------------------------------
+        # 4) 최종 상태 로그
+        # --------------------------------------------
+        print(f"[최종 페이지 제목] {driver.title}", flush=True)
+        print(f"[최종 URL] {driver.current_url}", flush=True)
 
         print(
             f"[시간] 저장 : "
