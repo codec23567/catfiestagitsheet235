@@ -66,7 +66,8 @@ if modify_url:
 else:
     modify_url = ""
 
-text = (worksheet.acell("M4").value or "").replace("§", "\n\n")
+# M4 셀에는 완성된 HTML이 그대로 들어있다.
+html = worksheet.acell("M4").value or ""
 
 
 # URL이 없으면 종료
@@ -83,7 +84,7 @@ result = modify_post(
     user_id,
     user_pw,
     modify_url,
-    text
+    html
 )
 
 
