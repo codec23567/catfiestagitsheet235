@@ -44,7 +44,7 @@ user_pw = os.environ["CAT_PW"]
 # 시트 데이터 읽기
 # -------------------------------------------------
 
-modify_url = worksheet.acell("M3").value
+modify_url = worksheet.acell("M4").value
 
 if modify_url:
     modify_url = modify_url.strip()
@@ -66,8 +66,8 @@ if modify_url:
 else:
     modify_url = ""
 
-# M4 셀에는 완성된 HTML이 그대로 들어있다.
-html = worksheet.acell("M4").value or ""
+# M5 셀에는 완성된 HTML이 그대로 들어있다.
+html = worksheet.acell("M5").value or ""
 
 
 # URL이 없으면 종료
