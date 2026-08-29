@@ -70,49 +70,76 @@ def to_modify_url(url):
 
 
 # -------------------------------------------------
-# G/H열에서 작업 대상 찾기
+# B/H열에서 작업 대상 찾기
+#
+# 구조: H{그룹시작행}=모음집 링크 / H{그룹시작행+1}=게시할 내용 / H{그룹시작행+2}=완료 날짜
+# - B열에 값이 있는 행 = 그룹 시작 행
+# - H(그룹시작행)에 링크가 없으면 대상 아님
+# - H(그룹시작행+2)에 값(완료 날짜)이 있으면 이미 처리된 것으로 보고 건너뜀
+# - gumsa(링크 일치 검증) 로직은 폐기 — 완료 날짜 유무만으로 판단
 # -------------------------------------------------
 
-rows = worksheet.get("G:H")
+START_ROW = 5
+NAME_COL = 2  # B열
+H_COL = 8     # H열
+
+b_values = worksheet.col_values(NAME_COL)
+h_values = worksheet.col_values(H_COL)
+
+# 길이 보정
+last_row = max(len(b_values), len(h_values), START_ROW)
+while len(b_values) < last_row:
+    b_values.append("")
+while len(h_values) < last_row:
+    h_values.append("")
+
 tasks = []
 
-for status_row, row in enumerate(rows, start=1):
-    g_value = str(row[0] if len(row) >= 1 else "").strip()
+for idx in range(START_ROW - 1, last_row):
+    name = str(b_values[idx]).strip() if idx < len(b_values) else ""
 
-    # G열이 불일치인 행만 처리
-    if g_value != "불일치":
-        continue
+    if not name:
+        continue  # 그룹 시작 행이 아니면 건너뜀
 
-    # 첫 행에는 바로 위 행이 없으므로 건너뜀
-    if status_row == 1:
-        print("G1은 불일치 상태로 처리할 수 없습니다.", flush=True)
-        continue
+    group_start_row = idx + 1  # 1-indexed 실제 시트 행 번호
 
-    # 바로 위 행의 G/H를 가져옴
-    previous_row = rows[status_row - 2]
+    link = str(h_values[idx]).strip() if idx < len(h_values) else ""
+    if not link:
+        continue  # 모음집 링크가 없는 그룹은 대상 아님
 
-    post_url = str(
-        previous_row[0] if len(previous_row) >= 1 else ""
-    ).strip()
+    content_idx = idx + 1
+    date_idx = idx + 2
 
-    post_text = str(
-        previous_row[1] if len(previous_row) >= 2 else ""
-    ).replace("§", "\n\n")
+    date_value = (
+        str(h_values[date_idx]).strip()
+        if date_idx < len(h_values)
+        else ""
+    )
 
-    modify_url = to_modify_url(post_url)
+    if date_value:
+        continue  # 완료 날짜가 있으면 이미 처리된 것으로 간주, 건너뜀
+
+    content_value = (
+        str(h_values[content_idx]).strip()
+        if content_idx < len(h_values)
+        else ""
+    )
+
+    modify_url = to_modify_url(link)
 
     if not modify_url:
         print(
-            f"G{status_row}: 바로 위 행의 게시글 URL이 비어 있어 건너뜁니다.",
+            f"{name} (H{group_start_row}): 모음집 링크 변환 실패, 건너뜁니다.",
             flush=True,
         )
         continue
 
     tasks.append(
         {
-            "status_row": status_row,
+            "name": name,
+            "date_row": date_idx + 1,  # 완료 날짜를 기록할 실제 시트 행 번호
             "modify_url": modify_url,
-            "text": post_text,
+            "text": content_value.replace("§", "\n\n"),
         }
     )
 
@@ -122,7 +149,7 @@ for status_row, row in enumerate(rows, start=1):
 # -------------------------------------------------
 
 if not tasks:
-    print("처리할 '불일치' 작업이 없습니다.", flush=True)
+    print("처리할 '모음집관리' 작업이 없습니다.", flush=True)
     raise SystemExit(0)
 
 print(f"처리할 작업 수: {len(tasks)}개", flush=True)
@@ -143,26 +170,24 @@ try:
     # -------------------------------------------------
 
     for task in tasks:
-        status_row = task["status_row"]
+        name = task["name"]
+        date_row = task["date_row"]
         modify_url = task["modify_url"]
         text = task["text"]
 
         print(
-            f"===== G{status_row} 작업 시작 =====",
+            f"===== {name} (H{date_row}) 작업 시작 =====",
             flush=True,
         )
         print(f"수정 URL: {modify_url}", flush=True)
 
-        # 작업 시작 상태
+        # 작업 시작 상태 - 완료 날짜 셀에 임시로 "실행중" 기록
         worksheet.update(
-            range_name=f"G{status_row}",
+            range_name=f"H{date_row}",
             values=[["실행중"]],
         )
 
-        print(
-            f"G{status_row}: 실행중",
-            flush=True,
-        )
+        print(f"{name}: 실행중", flush=True)
 
         result = modify_post(
             driver,
@@ -170,47 +195,38 @@ try:
             text,
         )
 
-        # 성공한 경우에만 상태 셀과 완료 시각을 변경
+        # 성공한 경우: 완료 날짜 셀에 실제 완료 시각 기록
         if result.get("success", False):
 
-            # 한국 시간 기준 완료 시각
             completed_at = datetime.now(
                 ZoneInfo("Asia/Seoul")
-            ).strftime("%-m/%-d %H:%M")
+            ).strftime("%m/%d %H:%M:%S")
 
-            # G열: 작업완료
             worksheet.update(
-                range_name=f"G{status_row}",
-                values=[["작업완료"]],
-            )
-
-            # 작업완료 바로 아래 셀: 완료 시각
-            worksheet.update(
-                range_name=f"G{status_row + 1}",
+                range_name=f"H{date_row}",
                 values=[[completed_at]],
             )
 
             print(
-                f"G{status_row}: 작업완료 / {completed_at}",
+                f"{name}: 완료 / {completed_at}",
                 flush=True,
             )
 
-        # 실패하면 불일치 상태를 그대로 둠
+        # 실패한 경우: 완료 날짜 셀을 다시 비워서 다음 실행 때 재시도 대상이 되게 함
         else:
             message = result.get(
                 "message",
                 "알 수 없는 오류",
             )
 
-            # 실패 시 다시 불일치로 유지
             worksheet.update(
-                range_name=f"G{status_row}",
-                values=[["불일치"]],
+                range_name=f"H{date_row}",
+                values=[[""]],
             )
 
             print(
-                f"G{status_row}: 실패. "
-                f"'불일치' 상태를 유지합니다. {message}",
+                f"{name}: 실패. 완료 날짜를 비워 다음 실행 시 재시도되게 합니다. "
+                f"{message}",
                 flush=True,
             )
 
