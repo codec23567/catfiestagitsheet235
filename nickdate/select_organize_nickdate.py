@@ -35,12 +35,13 @@ worksheet = spreadsheet.worksheet(
 # 실제 데이터가 시작되는 행
 start_row = 5
 
-# C열(URL), E열(날짜), F열(작성자) 읽기
+# C열(URL), F열(날짜), G열(작성자) 읽기
+# [새 구조] 날짜 E열 -> F열, 작성자 F열 -> G열로 이동
 urls = worksheet.col_values(3)
-dates = worksheet.col_values(5)
-authors = worksheet.col_values(6)
+dates = worksheet.col_values(6)
+authors = worksheet.col_values(7)
 
-# E/F열 길이가 부족하면 빈 문자열로 맞춰줌
+# F/G열 길이가 부족하면 빈 문자열로 맞춰줌
 while len(dates) < len(urls):
     dates.append("")
 
@@ -160,13 +161,14 @@ sheet_start = time.time()
 date_values = [[d] for d in dates[start_row - 1:]]
 author_values = [[a] for a in authors[start_row - 1:]]
 
+# [새 구조] 날짜 -> F열, 작성자 -> G열
 worksheet.update(
-    range_name=f"E{start_row}:E{start_row + len(date_values) - 1}",
+    range_name=f"F{start_row}:F{start_row + len(date_values) - 1}",
     values=date_values
 )
 
 worksheet.update(
-    range_name=f"F{start_row}:F{start_row + len(author_values) - 1}",
+    range_name=f"G{start_row}:G{start_row + len(author_values) - 1}",
     values=author_values
 )
 
