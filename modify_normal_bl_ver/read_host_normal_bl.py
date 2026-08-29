@@ -125,6 +125,17 @@ for idx in range(START_ROW - 1, last_row):
         else ""
     )
 
+    if not content_value:
+        # 게시할 내용이 비어있음 = C열 링크가 3개 미만이라
+        # GAS(buildCollectionPostContent)가 빈 문자열을 써둔 경우.
+        # 빈 내용으로 게시글을 덮어쓰지 않도록 대상에서 제외.
+        print(
+            f"{name} (H{group_start_row}): 게시할 내용이 비어있어 건너뜁니다 "
+            f"(C열 링크 3개 미만으로 추정).",
+            flush=True,
+        )
+        continue
+
     modify_url = to_modify_url(link)
 
     if not modify_url:
