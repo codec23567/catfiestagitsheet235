@@ -1,10 +1,10 @@
 FROM python:3.12-slim
 
-# Chrome 실행에 필요한 시스템 패키지 설치
 RUN apt-get update && apt-get install -y \
-    wget gnupg unzip curl \
-    && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    wget gnupg unzip curl ca-certificates \
+    && install -d -m 0755 /etc/apt/keyrings \
+    && wget -q -O /etc/apt/keyrings/google-chrome.asc https://dl.google.com/linux/linux_signing_key.pub \
+    && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
@@ -16,8 +16,4 @@ COPY modify_html_ver/ ./modify_html_ver/
 COPY modify_normal_ver/ ./modify_normal_ver/
 COPY modify_normal_bl_ver/ ./modify_normal_bl_ver/
 
-# 기본은 HTML 수정 실행
-# 다른 작업은 Azure Job "인수 재정의"로 경로만 바꿔서 실행:
-#   modify_normal_ver/read_host_normal.py
-#   modify_normal_bl_ver/read_host_normal_bl.py
 CMD ["python", "modify_html_ver/read_host_html.py"]
