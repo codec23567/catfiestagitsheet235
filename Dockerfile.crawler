@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY nickdate/ ./nickdate/
+COPY image/ ./image/
+
+# 기본은 닉네임/날짜 크롤링 실행
+# 이미지 추출을 돌리려면 Azure Job에서 "인수 재정의"로
+# image/select_organize_image.py 로 바꿔서 실행
+CMD ["python", "nickdate/select_organize_nickdate.py"]
