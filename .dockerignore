@@ -1,8 +1,0 @@
-.git
-.github
-*.md
-.gitignore
-modify_html_ver
-modify_normal_ver
-modify_normal_bl_ver
-Dockerfile.selenium
