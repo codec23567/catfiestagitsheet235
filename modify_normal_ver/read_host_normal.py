@@ -1,11 +1,40 @@
 import os
 import json
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import gspread
 from google.oauth2.service_account import Credentials
 
 from login_modify_normal import modify_post
+
+
+# -------------------------------------------------
+# 모바일 게시글 URL → PC 수정 URL 변환
+# -------------------------------------------------
+
+def to_modify_url(url):
+    url = str(url or "").strip()
+
+    # 모바일 게시글 URL
+    # https://m.dcinside.com/board/catfiesta/58
+    match = re.fullmatch(
+        r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
+        url,
+    )
+
+    if match:
+        gallery_id = match.group(1)
+        post_no = match.group(2)
+
+        return (
+            "https://gall.dcinside.com/mgallery/board/modify/"
+            f"?id={gallery_id}&no={post_no}"
+        )
+
+    # 이미 PC 수정 URL인 경우 등은 그대로 사용
+    return url
 
 
 # -------------------------------------------------
@@ -41,6 +70,18 @@ user_pw = os.environ["CAT_PW"]
 
 
 # -------------------------------------------------
+# 실행 상태 기록
+# -------------------------------------------------
+
+worksheet.update(
+    range_name="I15",
+    values=[["실행중"]]
+)
+
+print("실행중")
+
+
+# -------------------------------------------------
 # 시트 데이터 읽기
 # -------------------------------------------------
 
@@ -48,25 +89,9 @@ modify_url = worksheet.acell("I12").value
 
 if modify_url:
     modify_url = modify_url.strip()
-
-    # 모바일 게시글 URL을 PC 수정 URL로 변환
-    match = re.fullmatch(
-        r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
-        modify_url
-    )
-
-    if match:
-        gallery_id = match.group(1)
-        post_no = match.group(2)
-
-        modify_url = (
-            "https://gall.dcinside.com/mgallery/board/modify/"
-            f"?id={gallery_id}&no={post_no}"
-        )
 else:
     modify_url = ""
 
-# M5 셀에는 완성된 HTML이 그대로 들어있다.
 html = worksheet.acell("I13").value or ""
 
 
@@ -74,6 +99,15 @@ html = worksheet.acell("I13").value or ""
 if not modify_url:
     print("수정 URL이 없습니다.")
     exit()
+
+
+# -------------------------------------------------
+# 수정 URL 변환
+# -------------------------------------------------
+
+modify_url = to_modify_url(modify_url)
+
+print(f"수정 URL: {modify_url}")
 
 
 # -------------------------------------------------
@@ -94,12 +128,22 @@ result = modify_post(
 
 if result["success"]:
 
+    # 한국 시간 기준 완료 시각
+    completed_at = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).strftime("%m/%d %H:%M:%S")
+
     worksheet.update(
         range_name="I15",
         values=[["완료"]]
     )
 
-    print("완료")
+    worksheet.update(
+        range_name="I16",
+        values=[[completed_at]]
+    )
+
+    print(f"완료 : {completed_at}")
 
 else:
 
