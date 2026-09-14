@@ -44,7 +44,7 @@ user_pw = os.environ["CAT_PW"]
 # 시트 데이터 읽기
 # -------------------------------------------------
 
-modify_url = worksheet.acell("M4").value
+modify_url = worksheet.acell("I12").value
 
 if modify_url:
     modify_url = modify_url.strip()
@@ -67,7 +67,7 @@ else:
     modify_url = ""
 
 # M5 셀에는 완성된 HTML이 그대로 들어있다.
-html = worksheet.acell("M5").value or ""
+html = worksheet.acell("I13").value or ""
 
 
 # URL이 없으면 종료
@@ -95,7 +95,7 @@ result = modify_post(
 if result["success"]:
 
     worksheet.update(
-        range_name="M7",
+        range_name="I15",
         values=[["완료"]]
     )
 
@@ -106,7 +106,7 @@ else:
     message = result.get("message", "알 수 없는 오류")
 
     worksheet.update(
-        range_name="M7",
+        range_name="I15",
         values=[[f"실패 : {message}"]]
     )
 
