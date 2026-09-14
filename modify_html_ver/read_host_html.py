@@ -74,7 +74,7 @@ user_pw = os.environ["CAT_PW"]
 # -------------------------------------------------
 
 worksheet.update(
-    range_name="I9",
+    range_name="I7",
     values=[["실행중"]]
 )
 
@@ -134,12 +134,12 @@ if result["success"]:
     ).strftime("%m/%d %H:%M:%S")
 
     worksheet.update(
-        range_name="I9",
+        range_name="I7",
         values=[["완료"]]
     )
 
     worksheet.update(
-        range_name="I10",
+        range_name="I8",
         values=[[completed_at]]
     )
 
@@ -150,7 +150,7 @@ else:
     message = result.get("message", "알 수 없는 오류")
 
     worksheet.update(
-        range_name="I9",
+        range_name="I7",
         values=[[f"실패 : {message}"]]
     )
 
