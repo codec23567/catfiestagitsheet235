@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 import time
 
 import gspread
@@ -185,3 +186,17 @@ print(
 )
 
 print("완료")
+
+# ---------------------------------------------
+# [추가] 3회 재시도 후에도 끝내 실패한 항목이 있으면 실패로 알림
+# -> webhook.py가 감지해서 깃허브 백업으로 전환 가능
+# "retry" 표시 자체는 그대로 남아서, 다음 실행 때도 재시도 대상이 된다.
+# ---------------------------------------------
+
+if pending_rows:
+    print(
+        f"[경고] {len(pending_rows)}개 항목이 "
+        f"{MAX_RETRIES}회 재시도 후에도 실패했습니다.",
+        flush=True
+    )
+    sys.exit(1)
