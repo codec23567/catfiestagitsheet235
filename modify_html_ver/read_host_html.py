@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -96,9 +97,17 @@ html = worksheet.acell("I5").value or ""
 
 
 # URL이 없으면 종료
+# [변경] 이 경우도 "정상적으로 할 일이 없어서 끝남"이 아니라
+# 원래 있어야 할 URL이 없는 비정상 상황이므로 실패로 처리한다.
 if not modify_url:
     print("수정 URL이 없습니다.")
-    exit()
+
+    worksheet.update(
+        range_name="I7",
+        values=[["실패 : 수정 URL이 없습니다."]]
+    )
+
+    sys.exit(1)  # [추가] 실패로 알림
 
 
 # -------------------------------------------------
@@ -155,3 +164,5 @@ else:
     )
 
     print(f"실패 : {message}")
+
+    sys.exit(1)  # [추가] 실패로 알림 -> webhook.py가 감지해서 깃허브로 전환 가능
