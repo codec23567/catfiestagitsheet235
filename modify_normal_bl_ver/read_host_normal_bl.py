@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -76,7 +77,6 @@ def to_modify_url(url):
 # - B열에 값이 있는 행 = 그룹 시작 행
 # - H(그룹시작행)에 링크가 없으면 대상 아님
 # - H(그룹시작행+2)에 값(완료 날짜)이 있으면 이미 처리된 것으로 보고 건너뜀
-# - gumsa(링크 일치 검증) 로직은 폐기 — 완료 날짜 유무만으로 판단
 # -------------------------------------------------
 
 START_ROW = 5
@@ -172,6 +172,9 @@ print(f"처리할 작업 수: {len(tasks)}개", flush=True)
 
 driver = None
 
+# [추가] 이번 실행에서 실패한 항목이 하나라도 있었는지 기록
+any_failure = False
+
 try:
     driver = create_driver()
     login(driver, user_id, user_pw)
@@ -241,7 +244,20 @@ try:
                 flush=True,
             )
 
+            any_failure = True  # [추가] 실패 항목 있었음을 기록
+
 finally:
     if driver:
         driver.quit()
         print("Chrome 종료", flush=True)
+
+# -------------------------------------------------
+# [추가] 실패한 항목이 하나라도 있었으면 비정상 종료로 알림
+# -> webhook.py가 이를 감지해서 실패로 응답 -> 깃허브 백업 전환 가능
+# 항목별 재시도(날짜칸 비우기)는 그대로 유지되므로, 다음 실행 때도
+# 이 항목은 다시 시도된다.
+# -------------------------------------------------
+
+if any_failure:
+    print("일부 항목이 실패하여 비정상 종료로 표시합니다.", flush=True)
+    sys.exit(1)
