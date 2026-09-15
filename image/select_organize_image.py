@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -71,14 +72,26 @@ img_list = []
 
 if requests:
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    # [변경] regex_test.py의 extract_images()가 이제 실패 시 조용히
+    # []을 반환하지 않고 예외를 그대로 던지도록(raise) 바뀌었다.
+    # 그 예외가 여기까지 전달되면, 로그에 명확히 남기고 sys.exit(1)로
+    # 이번 실행이 실패했음을 확실히 알린다.
+    # (참고: try/except로 감싸지 않아도 예외가 나면 파이썬은 기본적으로
+    #  비정상 종료(exit code 1)되지만, 여기서는 실패 상황임을 로그에
+    #  명확히 남기기 위해 명시적으로 처리한다.)
+    try:
+        with ThreadPoolExecutor(max_workers=10) as executor:
 
-        results = list(
-            executor.map(
-                extract_images,
-                requests
+            results = list(
+                executor.map(
+                    extract_images,
+                    requests
+                )
             )
-        )
+
+    except Exception as e:
+        print(f"[오류] 이미지 추출 중 실패로 이번 실행을 중단합니다: {e}", flush=True)
+        sys.exit(1)  # [추가] 실패로 명확히 알림 -> webhook.py가 감지 가능
 
     for images in results:
 
