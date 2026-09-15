@@ -59,7 +59,9 @@ def modify_post(
 
     driver = webdriver.Chrome(options=options)
 
-    wait = WebDriverWait(driver, 5)
+    # [변경] 5초 -> 15초로 상향. 사이트가 평소보다 느려지는 순간에도
+    # 여유를 두고 기다리도록 함. 평소 로딩 속도에는 영향 없음.
+    wait = WebDriverWait(driver, 15)
 
     try:
 
