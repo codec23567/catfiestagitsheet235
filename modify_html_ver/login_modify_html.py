@@ -59,7 +59,7 @@ def modify_post(
 
     driver = webdriver.Chrome(options=options)
 
-    wait = WebDriverWait(driver, 5)
+    wait = WebDriverWait(driver, 10)
 
     try:
 
