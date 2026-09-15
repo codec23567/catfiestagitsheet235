@@ -54,7 +54,8 @@ def login(driver, user_id, user_pw):
     print("★★★★★ 로그인 시작 ★★★★★", flush=True)
 
     start = time.perf_counter()
-    wait = WebDriverWait(driver, 5)
+    # [변경] 5초 -> 15초
+    wait = WebDriverWait(driver, 15)
 
     driver.get(LOGIN_URL)
 
@@ -95,7 +96,8 @@ def modify_post(driver, modify_url, text):
     start = time.perf_counter()
     t = time.perf_counter()
 
-    wait = WebDriverWait(driver, 5)
+    # [변경] 5초 -> 15초
+    wait = WebDriverWait(driver, 15)
     short_wait = WebDriverWait(driver, 20)
 
     try:
@@ -428,6 +430,19 @@ def modify_post(driver, modify_url, text):
         # 저장 버튼 클릭 직후 상태 확인
         # ============================================
 
+        # [추가] 최종적으로 저장이 성공했다고 볼 수 있는지 여부.
+        # 아래 확인 과정에서 문제가 발견되면 False로 바뀐다.
+        save_confirmed = False
+        failure_reason = None
+
+        # [추가] "확실히 정상적인 절차의 일부"라고 알려진 경고창 문구 목록.
+        # 여기 있는 것만 안전하게 통과시키고, 목록에 없는 낯선 경고창은
+        # 무슨 뜻인지 모르므로 안전하게 실패로 처리한다.
+        # 새로운 정상 경고창을 발견하면 이 목록에 문구(일부)를 추가하면 된다.
+        SAFE_ALERT_KEYWORDS = [
+            "유튜브 링크가 포함되어 있습니다",
+        ]
+
         # --------------------------------------------
         # 1) 브라우저 네이티브 alert(경고창) 발생 여부 확인
         # --------------------------------------------
@@ -438,6 +453,20 @@ def modify_post(driver, modify_url, text):
             alert_text = alert.text
             print(f"[경고창 감지] {alert_text}", flush=True)
             alert.accept()
+
+            # [변경] 알려진 안전한 경고창(예: 유튜브 링크 변환 확인창)이면
+            # 그냥 확인만 하고 정상 진행. 그 외 낯선 경고창은 무슨 뜻인지
+            # 모르므로 안전하게 실패로 처리한다.
+            if any(keyword in alert_text for keyword in SAFE_ALERT_KEYWORDS):
+                print(
+                    "[정상 절차로 확인된 경고창] "
+                    "확인만 하고 계속 진행합니다.",
+                    flush=True,
+                )
+            else:
+                failure_reason = (
+                    f"알 수 없는 경고창 발생 (확인 필요): {alert_text}"
+                )
 
         except Exception:
             print("[경고창 없음]", flush=True)
@@ -454,6 +483,9 @@ def modify_post(driver, modify_url, text):
                 f"[클릭 후 URL 변경됨] {driver.current_url}",
                 flush=True,
             )
+
+            # [추가] URL이 실제로 바뀌었다면 저장 성공으로 간주
+            save_confirmed = True
 
         except Exception:
             print(
@@ -473,8 +505,22 @@ def modify_post(driver, modify_url, text):
             if error_elements:
                 for el in error_elements:
                     print(f"[에러 메시지 감지] {el.text}", flush=True)
+
+                # [추가] 에러 메시지가 실제로 화면에 보였다면 명백한 실패
+                failure_reason = (
+                    "저장 후 에러 메시지 감지: "
+                    + " / ".join(el.text for el in error_elements)
+                )
             else:
                 print("[에러 메시지 요소 없음]", flush=True)
+
+                # [추가] URL도 안 바뀌고 에러 메시지도 없다면,
+                # 저장이 실제로 성공했다고 확신할 근거가 없으므로
+                # 안전하게 실패로 처리한다.
+                if failure_reason is None:
+                    failure_reason = (
+                        "저장 후 URL 변경 확인 실패 (에러 메시지도 없음)"
+                    )
 
         # --------------------------------------------
         # 4) 최종 상태 로그
@@ -488,9 +534,17 @@ def modify_post(driver, modify_url, text):
             flush=True,
         )
 
-        return {
-            "success": True,
-        }
+        # [변경] 무조건 True를 반환하지 않고,
+        # 실제로 저장이 확인됐는지에 따라 결과를 나눈다.
+        if save_confirmed and failure_reason is None:
+            return {
+                "success": True,
+            }
+        else:
+            return {
+                "success": False,
+                "message": failure_reason or "저장 확인 실패",
+            }
 
     except Exception as e:
         traceback.print_exc()
