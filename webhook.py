@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# .env 파일에서 CAT_ID, CAT_PW 읽기
+# .env 파일에서 CAT_ID, CAT_PW 읽기. 마이와이프루나샤
 def load_env_file(path):
     env = {}
     with open(path) as f:
