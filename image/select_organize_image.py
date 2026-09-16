@@ -38,9 +38,6 @@ worksheet = spreadsheet.worksheet(
 
 row3 = worksheet.row_values(3)
 
-# [변경] requests -> target_urls
-# (requests 라이브러리명과 겹쳐서 나중에 import requests 추가 시
-#  변수가 라이브러리를 가려버리는 사고를 방지)
 target_urls = []
 
 # K열(11) ~ T열(20)
