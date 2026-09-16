@@ -104,7 +104,7 @@ while pending_requests and current_try < MAX_RETRIES:
 
     # 병렬 크롤링
     # [변경] max_workers 20 -> 8 (동시성 낮춤)
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         results = list(executor.map(extract_nickdate, pending_requests))
 
     batch_time = time.time() - batch_start
