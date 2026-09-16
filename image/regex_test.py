@@ -31,6 +31,20 @@ def extract_images(url):
             flush=True
         )
 
+        # -------------------------
+        # 삭제된 글 판정
+        # -------------------------
+        # [추가] nickdate_test.py와 동일하게 404를 "삭제된 글"로 명시적
+        # 구분한다. 삭제된 글은 재시도해도 결과가 바뀌지 않으므로,
+        # 여기서 즉시 확정해서 select_organize_image.py의 재시도
+        # 대상에서 빠지게 한다.
+        if response.status_code == 404:
+            print(f"[삭제됨] {url}", flush=True)
+            return {
+                "images": [],
+                "deleted": True
+            }
+
         html = response.text
 
         # -------------------------
@@ -100,18 +114,19 @@ def extract_images(url):
             flush=True
         )
 
-        return images
+        # [변경] 리스트 대신 dict로 반환 (select_organize_image.py와
+        # 계약 일치: {"images": [...], "deleted": bool})
+        return {
+            "images": images,
+            "deleted": False
+        }
 
     except Exception as e:
 
         print(f"[오류] {url}", flush=True)
         print(e, flush=True)
 
-        # [변경] 여기서 빈 목록([])을 반환하면 "이미지가 원래 없었다"는
-        # 것과 "요청/처리 중 에러가 나서 못 가져왔다"는 것을 구분할 수
-        # 없게 된다. 그러면 실제로는 실패한 건데 시트에는 마치 정상적으로
-        # "이미지 없음"인 것처럼 잘못 기록될 수 있다.
         # 에러를 조용히 삼키지 않고 그대로 다시 던져서(raise), 이 실패가
         # 호출한 쪽(select_organize_image.py)까지 확실히 전달되게 한다.
+        # -> 호출부의 재시도 로직이 이 예외를 잡아 재시도 대상으로 처리한다.
         raise
-        
