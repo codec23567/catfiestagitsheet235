@@ -95,7 +95,7 @@ while pending_urls and current_try < MAX_RETRIES:
 
     next_pending = []
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         future_to_url = {
             executor.submit(extract_images, url): url
             for url in pending_urls
