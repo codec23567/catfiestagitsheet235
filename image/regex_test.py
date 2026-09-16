@@ -34,10 +34,6 @@ def extract_images(url):
         # -------------------------
         # 삭제된 글 판정
         # -------------------------
-        # [추가] nickdate_test.py와 동일하게 404를 "삭제된 글"로 명시적
-        # 구분한다. 삭제된 글은 재시도해도 결과가 바뀌지 않으므로,
-        # 여기서 즉시 확정해서 select_organize_image.py의 재시도
-        # 대상에서 빠지게 한다.
         if response.status_code == 404:
             print(f"[삭제됨] {url}", flush=True)
             return {
