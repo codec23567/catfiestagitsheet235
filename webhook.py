@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# .env 파일에서 CAT_ID, CAT_PW 읽기. 마이와이프루나샤
+# .env 파일에서 CAT_ID, CAT_PW 읽기.
 def load_env_file(path):
     env = {}
     with open(path) as f:
@@ -38,11 +38,20 @@ WORKFLOWS = {
 }
 
 # ------------------------------------------------------------------
-# 같은 시트가 동시에 두 번 실행되는 것을 막는 잠금 장치
-# key: sheet_name, value: True(작업중)
+# 같은 시트 + 같은 워크플로우가 동시에 두 번 실행되는 것을 막는 잠금 장치
+# key: (workflow, sheet_name), value: True(작업중)
+#
+# [변경] 기존에는 key가 sheet_name 하나였다. 그러면 한 시트 안에
+# nickdate와 image처럼 서로 다른 워크플로우를 동시에 실행하려 해도
+# "같은 시트"라는 이유만으로 뒤 요청이 거절/대기됐다.
+# 하지만 nickdate는 F/G열, image는 J열처럼 서로 건드리는 열이 다르면
+# 진짜로 동시에 돌려도 데이터 충돌이 없다.
+# 그래서 key를 (workflow, sheet_name) 튜플로 바꿔서,
+# "같은 시트 + 같은 워크플로우" 중복만 막고
+# "같은 시트 + 다른 워크플로우"는 병렬 실행을 허용한다.
 # ------------------------------------------------------------------
 running_lock = threading.Lock()
-running_sheets = set()
+running_jobs = set()
 
 # 스크립트가 아무리 길어도 이 시간(초)이 지나면 강제로 실패 처리
 SCRIPT_TIMEOUT_SECONDS = 120
@@ -110,14 +119,19 @@ def run():
     if not sheet_name:
         return jsonify({"error": "sheet_name required"}), 400
 
-    # 이미 같은 시트가 작업 중이면 거절
+    # [변경] job_key = (workflow, sheet_name)
+    # 같은 시트라도 워크플로우가 다르면 서로 다른 job으로 취급해서
+    # 병렬 실행을 허용한다. 완전히 동일한 (workflow, sheet_name) 조합만
+    # 중복 실행을 막는다.
+    job_key = (workflow, sheet_name)
+
     with running_lock:
-        if sheet_name in running_sheets:
+        if job_key in running_jobs:
             return jsonify({
                 "success": False,
-                "error": f"'{sheet_name}' 시트는 이미 작업 진행중입니다. 잠시 후 다시 시도하세요."
+                "error": f"'{sheet_name}' 시트의 '{workflow}' 작업이 이미 진행중입니다. 잠시 후 다시 시도하세요."
             }), 409  # 409 = Conflict(충돌)
-        running_sheets.add(sheet_name)
+        running_jobs.add(job_key)
 
     folder, script, needs_cat_login = WORKFLOWS[workflow]
 
@@ -128,7 +142,7 @@ def run():
     finally:
         # 작업 끝났으니 잠금 해제 (성공하든 실패하든 반드시 실행)
         with running_lock:
-            running_sheets.discard(sheet_name)
+            running_jobs.discard(job_key)
 
     if success:
         return jsonify({
@@ -150,4 +164,11 @@ def run():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    # [변경] threaded=True 추가
+    # 기존에는 Flask 개발 서버가 기본적으로 싱글 스레드라, 서로 다른
+    # 워크플로우 요청이라도 앞 요청이 끝날 때까지 뒤 요청이 대기해야 했다.
+    # threaded=True로 바꾸면 요청마다 별도 스레드에서 처리되어
+    # nickdate/image처럼 서로 다른 워크플로우를 진짜로 동시에 실행할 수 있다.
+    # (주의: 여러 요청의 subprocess가 동시에 뜨는 만큼 서버 CPU/메모리
+    #  사용량도 동시에 올라간다 - Vultr 서버 사양에 여유가 있는지 확인 필요)
+    app.run(host="0.0.0.0", port=5000, threaded=True)
