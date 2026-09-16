@@ -37,7 +37,6 @@ worksheet = spreadsheet.worksheet(
 start_row = 5
 
 # C열(URL), F열(날짜), G열(작성자) 읽기
-# [새 구조] 날짜 E열 -> F열, 작성자 F열 -> G열로 이동
 urls = worksheet.col_values(3)
 dates = worksheet.col_values(6)
 authors = worksheet.col_values(7)
