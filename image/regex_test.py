@@ -122,7 +122,4 @@ def extract_images(url):
         print(f"[오류] {url}", flush=True)
         print(e, flush=True)
 
-        # 에러를 조용히 삼키지 않고 그대로 다시 던져서(raise), 이 실패가
-        # 호출한 쪽(select_organize_image.py)까지 확실히 전달되게 한다.
-        # -> 호출부의 재시도 로직이 이 예외를 잡아 재시도 대상으로 처리한다.
         raise
