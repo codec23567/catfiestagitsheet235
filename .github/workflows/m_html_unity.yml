@@ -8,8 +8,8 @@ on:
         required: true
         type: choice
         options:
-          - m_html
-          - m_normal
+          - m_html_one
+          - m_html_two
       sheet_name:
         description: "Target sheet"
         required: true
