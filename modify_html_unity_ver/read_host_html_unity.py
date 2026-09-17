@@ -6,8 +6,8 @@ read_host_html.py 와 read_host_normal.py 를 통합한 스크립트.
 셀 주소를 workflow_config.py 에서 읽어오는 방식으로 통합했습니다.
 
 사용법 (webhook.py 에서 호출할 때, modify_html_unity_ver 폴더 안에서 실행):
-    python3 read_host_html_unity.py m_html
-    python3 read_host_html_unity.py m_normal
+    python3 read_host_html_unity.py m_html_one
+    python3 read_host_html_unity.py m_html_two
 
 필요한 환경변수 (webhook.py 가 이미 넘겨주고 있음):
     GOOGLE_CREDENTIALS : 구글 서비스 계정 JSON (문자열)
