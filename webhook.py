@@ -30,21 +30,26 @@ WEBHOOK_SECRET = CAT_ENV.get("WEBHOOK_SECRET", "changeme")
 
 # 워크플로우 이름 -> (실행 폴더, 실행할 스크립트(리스트로, 인자 포함 가능), CAT 로그인 필요 여부)
 #
-# [변경] m_html / m_normal 은 이제 각자 폴더(modify_html_ver / modify_normal_ver)를
+# [변경] m_html_one / m_html_two 는 이제 각자 폴더(modify_html_ver / modify_normal_ver)를
 # 쓰지 않고, modify_html_unity_ver/read_host_html_unity.py 를 워크플로우 이름을 인자로
 # 넘겨서 공용으로 실행합니다. (modify_html_unity_ver/workflow_config.py 에 셀 주소가 정의되어 있음)
 # 새 워크플로우가 "로직은 같고 셀 주소만 다른" 경우라면, 새 폴더를 만들 필요 없이
 # modify_html_unity_ver/workflow_config.py 에 항목을 추가하고 여기에 한 줄만 추가하면 됩니다.
 #
+# [이름 변경] m_html / m_normal -> m_html_one / m_html_two
+# 둘 다 HTML 모드로 게시글을 수정하는 동일한 로직이라(대상 셀만 다름),
+# "normal"이라는 이름이 오히려 혼동을 줘서 m_html_one(시리즈관리, I3),
+# m_html_two(특수 게시글, I11)로 이름을 통일했습니다.
+#
 # "workflow"는 두 가지 의미 중 하나로 쓰입니다.
-#  - 여기서는 내부 작업 이름표(m_html, m_normal 등)라는 의미로 쓰임
+#  - 여기서는 내부 작업 이름표(m_html_one, m_html_two 등)라는 의미로 쓰임
 #  - GitHub Actions 워크플로우(.yml 파일)는 다른 의미
 
 WORKFLOWS = {
     "nickdate": ("nickdate", ["select_organize_nickdate.py"], False),
     "image": ("image", ["select_organize_image.py"], False),
-    "m_html": ("modify_html_unity_ver", ["read_host_html_unity.py", "m_html"], True),
-    "m_normal": ("modify_html_unity_ver", ["read_host_html_unity.py", "m_normal"], True),
+    "m_html_one": ("modify_html_unity_ver", ["read_host_html_unity.py", "m_html_one"], True),
+    "m_html_two": ("modify_html_unity_ver", ["read_host_html_unity.py", "m_html_two"], True),
     "m_normal_bl": ("modify_normal_bl_ver", ["read_host_normal_bl.py"], True),
 }
 
@@ -66,7 +71,7 @@ def run_script(folder, script_args, needs_cat_login, sheet_name):
     스크립트를 실행하고 '실제로 끝날 때까지' 기다린 뒤
     (성공여부, 로그일부) 를 돌려주는 함수.
 
-    script_args: 예) ["read_host_generic.py", "m_html"]
+    script_args: 예) ["read_host_html_unity.py", "m_html_one"]
                  (기존에는 ["read_host_html.py"] 처럼 파일 하나였지만,
                   이제 워크플로우 이름을 인자로 추가로 넘길 수 있도록
                   리스트를 그대로 받습니다.)
