@@ -1,4 +1,5 @@
 import requests
+import sys
 import time
 
 
@@ -65,6 +66,16 @@ def test_fetch(url):
 
 
 if __name__ == "__main__":
-    # 여기에 테스트하고 싶은 나무위키 문서 URL 입력
-    test_url = "https://namu.wiki/w/나무위키"
+
+    # 실행 방법 1: python3 namu_fetch_test.py "https://namu.wiki/w/문서명"
+    if len(sys.argv) > 1:
+        test_url = sys.argv[1]
+    else:
+        # 실행 방법 2: 인자 없이 실행하면 직접 입력받음
+        test_url = input("테스트할 나무위키 URL 입력: ").strip()
+
+    if not test_url:
+        print("[오류] URL이 입력되지 않았습니다.")
+        sys.exit(1)
+
     test_fetch(test_url)
