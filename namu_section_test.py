@@ -39,6 +39,16 @@ def extract_namu_section_images(url):
     print(f"[결과] h4 제목 수 : {len(headings)}", flush=True)
 
     # -------------------------
+    # 구간 경계용: h2/h3/h4 전부의 "여는 태그 시작 위치" 수집
+    # (h4끼리만 자르면, 카테고리에 h4가 하나뿐일 때
+    #  다음 대분류까지 통째로 삼켜버리는 문제가 생김)
+    # -------------------------
+    all_heading_starts = [
+        m.start() for m in re.finditer(r'<h[2-4][^>]*>', html)
+    ]
+    all_heading_starts.sort()
+
+    # -------------------------
     # 이미지 정규식 (기존과 동일)
     # -------------------------
     img_regex = re.compile(
@@ -51,13 +61,13 @@ def extract_namu_section_images(url):
     for i, h in enumerate(headings):
 
         section_start = h["start"]
-        section_end = headings[i + 1]["start"] if i + 1 < len(headings) else len(html)
 
-        # 다음 제목의 <h4...> 여는 태그 이전까지가 진짜 본문 구간
-        # (헤딩 텍스트 자체는 이미 h["start"]가 </h4> 뒤라서 안전)
-        next_heading_tag_start = html.find("<h4", section_start)
-        if next_heading_tag_start != -1 and next_heading_tag_start < section_end:
-            section_end = next_heading_tag_start
+        # section_start 이후에 나오는 가장 가까운 h2/h3/h4 시작점을 찾음
+        section_end = len(html)
+        for pos in all_heading_starts:
+            if pos > section_start:
+                section_end = pos
+                break
 
         section_html = html[section_start:section_end]
 
