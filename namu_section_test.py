@@ -84,9 +84,28 @@ def extract_namu_section_images(url):
 
         results.append({
             "title": h["title"],
-            "image_count_in_section": len(images),
-            "images": images
+            "raw_images": images  # 필터링 전 원본 (구간 내 전체)
         })
+
+    # -------------------------
+    # 여러 구간에 걸쳐 중복 등장하는 이미지 = 공용 아이콘으로 간주하고 제거
+    # (캐릭터 고유 이미지는 보통 그 구간에만 등장함)
+    # -------------------------
+    from collections import Counter
+
+    url_counter = Counter()
+    for r in results:
+        # 한 구간 내에서는 이미 중복 제거된 상태이므로 그대로 카운트
+        for img_tag in r["raw_images"]:
+            url_counter[img_tag] += 1
+
+    for r in results:
+        r["images"] = [
+            img for img in r["raw_images"]
+            if url_counter[img] == 1
+        ]
+        r["image_count_in_section"] = len(r["images"])
+        del r["raw_images"]
 
     print(f"[시간] 전체 : {time.time() - total_start:.2f}초", flush=True)
 
