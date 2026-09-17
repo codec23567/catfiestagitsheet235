@@ -1,0 +1,44 @@
+name: Modify Unity
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow:
+        description: "실행할 워크플로우"
+        required: true
+        type: choice
+        options:
+          - m_html
+          - m_normal
+      sheet_name:
+        description: "Target sheet"
+        required: true
+        type: string
+
+jobs:
+  modify-unity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium gspread google-auth
+
+      - name: Run Modify Unity
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          TARGET_SHEET: ${{ github.event.inputs.sheet_name }}
+          CAT_ID: ${{ secrets.CAT_ID }}
+          CAT_PW: ${{ secrets.CAT_PW }}
+        run: |
+          cd modify_html_unity_ver
+          python read_host_html_unity.py "${{ github.event.inputs.workflow }}"
