@@ -1,125 +1,78 @@
 import requests
-import re
+import sys
 import time
 
 
-def extract_images(url):
+def test_fetch(url):
 
-    total_start = time.time()
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    start = time.time()
 
     try:
-
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-
-        request_start = time.time()
-
         response = requests.get(
             url,
             headers=headers,
-            timeout=30
+            timeout=15
         )
 
-        print(
-            f"[시간] HTTP 요청 : {time.time() - request_start:.2f}초",
-            flush=True
-        )
+        elapsed = time.time() - start
 
-        print(
-            f"[응답] 상태={response.status_code}, 바이트={len(response.content)}",
-            flush=True
-        )
-
-        # -------------------------
-        # 삭제된 글 판정
-        # -------------------------
-        if response.status_code == 404:
-            print(f"[삭제됨] {url}", flush=True)
-            return {
-                "images": [],
-                "deleted": True
-            }
+        print(f"[요청 시간] {elapsed:.2f}초")
+        print(f"[상태 코드] {response.status_code}")
+        print(f"[응답 바이트] {len(response.content)}")
+        print(f"[Content-Type] {response.headers.get('Content-Type')}")
 
         html = response.text
 
-        # -------------------------
-        # write_div 영역만 추출
-        # -------------------------
+        # 클라우드플레어/봇 차단 페이지인지 대략 확인
+        block_markers = [
+            "cf-browser-verification",
+            "Attention Required",
+            "Just a moment",
+            "captcha",
+        ]
 
-        body_part = html
+        blocked = any(marker.lower() in html.lower() for marker in block_markers)
 
-        body_start = html.find('class="write_div"')
+        print(f"[봇 차단 의심] {blocked}")
 
-        if body_start != -1:
-
-            body_end = html.find(
-                '<script id="mg_numbering-tmpl"',
-                body_start
-            )
-
-            if body_end == -1:
-                body_end = html.find(
-                    '<script',
-                    body_start
-                )
-
-            if body_end != -1:
-                body_part = html[body_start:body_end]
-            else:
-                body_part = html[body_start:]
-
-        # -------------------------
-        # 이미지 추출
-        # -------------------------
-
-        regex_start = time.time()
-
-        img_regex = re.compile(
-            r'<img[^>]*(?:src|data-src|data-original)=["\']([^"\']*viewimage\.php[^"\']*)["\']',
-            re.IGNORECASE
+        # 실제 문서 내용이 있는지 확인 (나무위키 본문 영역 마커)
+        has_content = (
+            'wiki-heading' in html
+            or 'wiki-inner-content' in html
+            or '<article' in html
         )
 
-        matches = img_regex.findall(body_part)
+        print(f"[본문 마커 발견] {has_content}")
 
-        images = []
+        # HTML 앞부분 미리보기 (구조 확인용)
+        print("\n----- HTML 앞부분 미리보기 (2000자) -----")
+        print(html[:2000])
 
-        for src in matches:
+        # 저장해서 나중에 img 태그 구조 살펴보기 쉽게
+        with open("namu_sample.html", "w", encoding="utf-8") as f:
+            f.write(html)
 
-            if src.startswith("/"):
-                src = "https://www.dcinside.com" + src
-
-            src = src.replace("&amp;", "&")
-
-            images.append(
-                f'<img src="{src}">'
-            )
-
-        print(
-            f"[시간] 정규식 : {time.time() - regex_start:.4f}초",
-            flush=True
-        )
-
-        print(
-            f"[결과] 이미지 수 : {len(images)}",
-            flush=True
-        )
-
-        print(
-            f"[시간] 전체 : {time.time() - total_start:.2f}초",
-            flush=True
-        )
-
-        # [변경] 리스트 대신 dict로 반환 (select_organize_image.py와
-        # 계약 일치: {"images": [...], "deleted": bool})
-        return {
-            "images": images,
-            "deleted": False
-        }
+        print("\n[저장 완료] namu_sample.html")
 
     except Exception as e:
+        print(f"[오류] {e}")
 
-        print(f"[오류] {url}", flush=True)
-        print(e, flush=True)
 
-        raise
+if __name__ == "__main__":
+
+    # 실행 방법 1: python3 namu_fetch_test.py "https://namu.wiki/w/문서명"
+    if len(sys.argv) > 1:
+        test_url = sys.argv[1]
+    else:
+        # 실행 방법 2: 인자 없이 실행하면 직접 입력받음
+        test_url = input("테스트할 나무위키 URL 입력: ").strip()
+
+    if not test_url:
+        print("[오류] URL이 입력되지 않았습니다.")
+        sys.exit(1)
+
+    test_fetch(test_url)
