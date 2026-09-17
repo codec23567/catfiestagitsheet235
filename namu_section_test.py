@@ -79,7 +79,8 @@ def extract_namu_section_images(url):
             if src in seen:
                 continue
             seen.add(src)
-            images.append("https:" + src)
+            full_src = "https:" + src
+            images.append(f'<img src="{full_src}">')
 
         second_image = images[1] if len(images) > 1 else None
 
