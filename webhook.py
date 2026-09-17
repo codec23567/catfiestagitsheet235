@@ -35,6 +35,11 @@ WEBHOOK_SECRET = CAT_ENV.get("WEBHOOK_SECRET", "changeme")
 # 넘겨서 공용으로 실행합니다. (modify_html_unity_ver/workflow_config.py 에 셀 주소가 정의되어 있음)
 # 새 워크플로우가 "로직은 같고 셀 주소만 다른" 경우라면, 새 폴더를 만들 필요 없이
 # modify_html_unity_ver/workflow_config.py 에 항목을 추가하고 여기에 한 줄만 추가하면 됩니다.
+#
+# "workflow"는 두 가지 의미 중 하나로 쓰입니다.
+#  - 여기서는 내부 작업 이름표(m_html, m_normal 등)라는 의미로 쓰임
+#  - GitHub Actions 워크플로우(.yml 파일)는 다른 의미
+
 WORKFLOWS = {
     "nickdate": ("nickdate", ["select_organize_nickdate.py"], False),
     "image": ("image", ["select_organize_image.py"], False),
