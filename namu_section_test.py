@@ -81,12 +81,12 @@ def extract_namu_section_images(url):
             seen.add(src)
             images.append("https:" + src)
 
-        first_image = images[0] if images else None
+        second_image = images[1] if len(images) > 1 else None
 
         results.append({
             "title": h["title"],
             "image_count_in_section": len(images),
-            "first_image": first_image
+            "second_image": second_image
         })
 
     print(f"[시간] 전체 : {time.time() - total_start:.2f}초", flush=True)
@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
     results = extract_namu_section_images(test_url)
 
-    print("\n----- 제목별 첫 이미지 -----")
+    print("\n----- 제목별 두 번째 이미지 -----")
     for r in results:
         print(f'[{r["title"]}] (구간 내 이미지 {r["image_count_in_section"]}개)')
-        print(f'  -> {r["first_image"]}')
+        print(f'  -> {r["second_image"]}')
