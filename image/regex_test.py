@@ -31,9 +31,7 @@ def extract_images(url):
             flush=True
         )
 
-        # -------------------------
-        # 삭제된 글 판정
-        # -------------------------
+        # 사이트에서는 삭제된 글에 404 반환
         if response.status_code == 404:
             print(f"[삭제됨] {url}", flush=True)
             return {
@@ -43,10 +41,7 @@ def extract_images(url):
 
         html = response.text
 
-        # -------------------------
-        # write_div 영역만 추출
-        # -------------------------
-
+        # 본문(write_div) 영역만 잘라내서 이후 정규식 검사 범위를 좁힌다
         body_part = html
 
         body_start = html.find('class="write_div"')
@@ -68,10 +63,6 @@ def extract_images(url):
                 body_part = html[body_start:body_end]
             else:
                 body_part = html[body_start:]
-
-        # -------------------------
-        # 이미지 추출
-        # -------------------------
 
         regex_start = time.time()
 
@@ -110,8 +101,8 @@ def extract_images(url):
             flush=True
         )
 
-        # [변경] 리스트 대신 dict로 반환 (select_organize_image.py와
-        # 계약 일치: {"images": [...], "deleted": bool})
+        # select_organize_image.py와의 계약 일치를 위해 dict로 반환
+        # ({"images": [...], "deleted": bool})
         return {
             "images": images,
             "deleted": False
