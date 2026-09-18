@@ -9,12 +9,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from regex_test import extract_images
 
 
-# Google Sheets API 권한
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets"
 ]
 
-# GitHub Secret 인증
 credentials = Credentials.from_service_account_info(
     json.loads(os.environ["GOOGLE_CREDENTIALS"]),
     scopes=SCOPES
@@ -22,7 +20,6 @@ credentials = Credentials.from_service_account_info(
 
 gc = gspread.authorize(credentials)
 
-# 스프레드시트 열기
 spreadsheet = gc.open_by_key(
     "13Hp2IqBFzHE5L4xqGpieu-GVu0mA79fV06xYuFfnSB0"
 )
@@ -40,7 +37,7 @@ row3 = worksheet.row_values(3)
 
 target_urls = []
 
-# K열(11) ~ T열(20)
+# K열(11) ~ T열(20): col-1을 인덱스로 사용해 row3에서 값을 찾는다
 for col in range(11, 21):
 
     index = col - 1
@@ -79,7 +76,6 @@ for url in target_urls:
 
 MAX_RETRIES = 3
 
-# url -> 최종 결과 dict
 url_results = {}
 
 pending_urls = target_urls[:]
@@ -108,7 +104,6 @@ while pending_urls and current_try < MAX_RETRIES:
     pending_urls = next_pending
     current_try += 1
 
-# 재시도를 다 써도 실패가 남았는지 확인
 if pending_urls:
     print(
         f"[오류] {len(pending_urls)}개 URL이 {MAX_RETRIES}회 재시도 후에도 "
@@ -155,19 +150,18 @@ for url in target_urls:
 
     if result.get("deleted"):
         print(f"[삭제됨] {url}", flush=True)
-        continue  # 삭제된 글은 이미지 0개로 확정, 리스트에 아무것도 추가 안 함
+        continue  # 삭제된 글은 이미지 0개로 확정, 리스트에 추가하지 않음
 
     img_list.extend(result.get("images", []))
 
-# 위에서 이미 "삭제 안 됐는데 이미지 0개"인 경우를 걸러냈으므로,
-# 여기 도달했다면 img_list가 비어있는 건 "URL 자체가 없었거나
-# 전부 삭제된 글"인 경우뿐이다.
+# 위에서 "삭제 안 됐는데 이미지 0개"인 경우는 이미 걸러졌으므로,
+# 여기서 img_list가 비었다면 URL이 없었거나 전부 삭제된 글인 경우뿐이다
 if len(img_list) == 0:
     img_list = ["본문 이미지 없음"]
 
 
 # -------------------------------------------------
-# B/K 읽기
+# B/K/J 열 읽기
 # -------------------------------------------------
 
 start_row = 5
@@ -191,9 +185,7 @@ j_values = worksheet.get(
     f"J{start_row}:J{last_row}"
 )
 
-
-# 길이 보정
-
+# gspread가 뒷부분 빈 행은 아예 반환하지 않으므로 num_rows에 맞춰 채워준다
 while len(b_values) < num_rows:
     b_values.append([""])
 
@@ -203,13 +195,13 @@ while len(k_values) < num_rows:
 while len(j_values) < num_rows:
     j_values.append([""])
 
-# J열의 빈 행([])을 [""]로 보정
+# J열의 빈 행은 [](빈 리스트)로 오므로 [""]로 맞춰준다
 for i in range(num_rows):
     if len(j_values[i]) == 0:
         j_values[i] = [""]
 
 # -------------------------------------------------
-# 기존 validBCount 매칭
+# B열 기준으로 유효 행을 세면서 이미지 매칭
 # -------------------------------------------------
 
 valid_b_count = 0
@@ -242,10 +234,6 @@ for i in range(num_rows):
         if k and str(k).strip():
             j_values[i][0] = ""
 
-
-# -------------------------------------------------
-# Google Sheets 저장
-# -------------------------------------------------
 
 worksheet.update(
     range_name=f"J{start_row}:J{last_row}",
