@@ -54,7 +54,7 @@ def login(driver, user_id, user_pw):
     print("★★★★★ 로그인 시작 ★★★★★", flush=True)
 
     start = time.perf_counter()
-    # [변경] 5초 -> 15초
+
     wait = WebDriverWait(driver, 15)
 
     driver.get(LOGIN_URL)
