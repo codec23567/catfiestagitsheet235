@@ -22,13 +22,6 @@ WORKFLOW_CELLS = {
         "status_cell": "I15",
         "done_cell": "I16",
     },
-  
-    # 새 워크플로우 추가 예시:
-    # "m_html_three": {
-    #     "url_cell": "K3",
-    #     "html_cell": "K5",
-    #     "status_cell": "K7",
-    #     "done_cell": "K8",
-    # },
+
 
 }
