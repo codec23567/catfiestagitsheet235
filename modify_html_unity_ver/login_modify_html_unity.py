@@ -59,8 +59,8 @@ def modify_post(
 
     driver = webdriver.Chrome(options=options)
 
-    # 사이트가 평소보다 느려지는 순간에도 여유를 두고 기다리도록 함.
-    # 평소 로딩 속도에는 영향 없음.
+    # 사이트가 평소보다 느려지는 순간 일정시간 대기
+    # 평소 로딩 속도에 영향 없음.
     wait = WebDriverWait(driver, 15)
 
     try:
