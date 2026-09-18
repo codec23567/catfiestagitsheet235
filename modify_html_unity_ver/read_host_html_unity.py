@@ -1,20 +1,3 @@
-"""
-read_host_html.py 와 read_host_normal.py 를 통합한 스크립트.
-
-기존에는 워크플로우(html/normal)마다 폴더+파일이 따로 있었지만,
-로직이 완전히 동일하고 "어떤 셀을 쓰느냐"만 달랐기 때문에
-셀 주소를 workflow_config.py 에서 읽어오는 방식으로 통합했습니다.
-
-사용법 (webhook.py 에서 호출할 때, modify_html_unity_ver 폴더 안에서 실행):
-    python3 read_host_html_unity.py m_html_one
-    python3 read_host_html_unity.py m_html_two
-
-필요한 환경변수 (webhook.py 가 이미 넘겨주고 있음):
-    GOOGLE_CREDENTIALS : 구글 서비스 계정 JSON (문자열)
-    TARGET_SHEET       : 대상 시트 이름
-    CAT_ID, CAT_PW      : 디시인사이드 로그인 정보
-"""
-
 import os
 import json
 import re
