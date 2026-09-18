@@ -15,8 +15,6 @@ def crawl_html(url: str, output_file: Path = OUTPUT_FILE) -> None:
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-
-    # 화면을 크게 잡아서 lazy-loading 이미지가 최대한 로딩되도록 한다.
     options.add_argument("--window-size=1920,1080")
 
     driver = webdriver.Chrome(options=options)
@@ -27,9 +25,7 @@ def crawl_html(url: str, output_file: Path = OUTPUT_FILE) -> None:
         print(f"[접속] {url}")
         driver.get(url)
 
-        # --------------------------------------------------
         # 1. 기본 페이지 로딩 완료 대기
-        # --------------------------------------------------
         WebDriverWait(driver, 30).until(
             lambda d: d.execute_script(
                 "return document.readyState"
@@ -38,12 +34,8 @@ def crawl_html(url: str, output_file: Path = OUTPUT_FILE) -> None:
 
         print("[완료] 기본 페이지 로딩")
 
-        # --------------------------------------------------
-        # 2. 페이지를 아래까지 천천히 스크롤
-        #
-        # loading="lazy" 이미지가 있기 때문에
-        # 페이지 전체를 한 번씩 화면에 노출시킨다.
-        # --------------------------------------------------
+        # 2. 페이지 전체를 스크롤해서
+        #    lazy-loading 영역을 최대한 활성화
         print("[진행] 페이지 전체 스크롤")
 
         driver.execute_script("""
@@ -55,14 +47,17 @@ def crawl_html(url: str, output_file: Path = OUTPUT_FILE) -> None:
 
         time.sleep(1)
 
-        page_height = driver.execute_script(
-            "return document.body.scrollHeight"
-        )
-
         current_position = 0
         scroll_step = 800
 
-        while current_position < page_height:
+        while True:
+            page_height = driver.execute_script(
+                "return document.body.scrollHeight"
+            )
+
+            if current_position >= page_height:
+                break
+
             current_position += scroll_step
 
             driver.execute_script(
@@ -70,15 +65,9 @@ def crawl_html(url: str, output_file: Path = OUTPUT_FILE) -> None:
                 current_position
             )
 
-            # lazy-loading 처리 시간을 조금 준다.
             time.sleep(0.3)
 
-            # 페이지 높이가 동적으로 늘어날 수 있으므로 다시 확인
-            page_height = driver.execute_script(
-                "return document.body.scrollHeight"
-            )
-
-        # 마지막 부분까지 확실히 노출
+        # 페이지 최하단까지 이동
         driver.execute_script(
             "window.scrollTo(0, document.body.scrollHeight);"
         )
@@ -87,39 +76,23 @@ def crawl_html(url: str, output_file: Path = OUTPUT_FILE) -> None:
 
         print("[완료] 페이지 전체 스크롤")
 
-        # --------------------------------------------------
-        # 3. 이미지 로딩 대기
-        # --------------------------------------------------
-        print("[진행] 이미지 로딩 확인")
+        # 3. 모든 이미지의 다운로드 완료를 기다리지는 않는다.
+        #    DOM의 src / data-src 등을 확보하는 것이 목적이므로
+        #    렌더링이 안정화될 정도만 기다린다.
+        print("[대기] 페이지 렌더링 안정화")
 
-        WebDriverWait(driver, 30).until(
-            lambda d: d.execute_script("""
-                const images = Array.from(document.images);
+        time.sleep(3)
 
-                if (images.length === 0) {
-                    return true;
-                }
+        print("[완료] 페이지 렌더링 안정화")
 
-                return images.every(img => {
-                    return img.complete;
-                });
-            """)
-        )
-
-        print("[완료] 이미지 로딩 확인")
-
-        # --------------------------------------------------
-        # 4. 페이지 최상단으로 복귀
-        # --------------------------------------------------
+        # 4. 최상단으로 복귀
         driver.execute_script(
             "window.scrollTo(0, 0);"
         )
 
         time.sleep(1)
 
-        # --------------------------------------------------
-        # 5. 최종 DOM 저장
-        # --------------------------------------------------
+        # 5. 최종 렌더링 DOM 저장
         html = driver.page_source
 
         output_file.write_text(
