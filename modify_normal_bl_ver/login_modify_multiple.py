@@ -430,15 +430,16 @@ def modify_post(driver, modify_url, text):
         # 저장 버튼 클릭 직후 상태 확인
         # ============================================
 
-        # [추가] 최종적으로 저장이 성공했다고 볼 수 있는지 여부.
+        # 최종적으로 저장이 성공했다고 볼 수 있는지 여부.
         # 아래 확인 과정에서 문제가 발견되면 False로 바뀐다.
+        
         save_confirmed = False
         failure_reason = None
 
-        # [추가] "확실히 정상적인 절차의 일부"라고 알려진 경고창 문구 목록.
-        # 여기 있는 것만 안전하게 통과시키고, 목록에 없는 낯선 경고창은
-        # 무슨 뜻인지 모르므로 안전하게 실패로 처리한다.
+        # "확실히 정상적인 절차의 일부"라고 알려진 경고창 문구 목록.
+        # 여기 있는 것만 안전하게 통과시킨다.
         # 새로운 정상 경고창을 발견하면 이 목록에 문구(일부)를 추가하면 된다.
+        
         SAFE_ALERT_KEYWORDS = [
             "유튜브 링크가 포함되어 있습니다",
         ]
@@ -454,9 +455,10 @@ def modify_post(driver, modify_url, text):
             print(f"[경고창 감지] {alert_text}", flush=True)
             alert.accept()
 
-            # [변경] 알려진 안전한 경고창(예: 유튜브 링크 변환 확인창)이면
+            # 알려진 안전한 경고창(예: 유튜브 링크 변환 확인창)이면
             # 그냥 확인만 하고 정상 진행. 그 외 낯선 경고창은 무슨 뜻인지
-            # 모르므로 안전하게 실패로 처리한다.
+            # 모르므로 안전하게 실패로 처리.
+            
             if any(keyword in alert_text for keyword in SAFE_ALERT_KEYWORDS):
                 print(
                     "[정상 절차로 확인된 경고창] "
@@ -506,7 +508,7 @@ def modify_post(driver, modify_url, text):
                 for el in error_elements:
                     print(f"[에러 메시지 감지] {el.text}", flush=True)
 
-                # [추가] 에러 메시지가 실제로 화면에 보였다면 명백한 실패
+                # 에러 메시지가 실제로 화면에 보였다면 명백한 실패
                 failure_reason = (
                     "저장 후 에러 메시지 감지: "
                     + " / ".join(el.text for el in error_elements)
@@ -514,7 +516,7 @@ def modify_post(driver, modify_url, text):
             else:
                 print("[에러 메시지 요소 없음]", flush=True)
 
-                # [추가] URL도 안 바뀌고 에러 메시지도 없다면,
+                # URL도 안 바뀌고 에러 메시지도 없다면,
                 # 저장이 실제로 성공했다고 확신할 근거가 없으므로
                 # 안전하게 실패로 처리한다.
                 if failure_reason is None:
@@ -534,7 +536,7 @@ def modify_post(driver, modify_url, text):
             flush=True,
         )
 
-        # [변경] 무조건 True를 반환하지 않고,
+        # 무조건 True를 반환하지 않고,
         # 실제로 저장이 확인됐는지에 따라 결과를 나눈다.
         if save_confirmed and failure_reason is None:
             return {
