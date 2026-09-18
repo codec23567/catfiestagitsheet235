@@ -59,8 +59,8 @@ def modify_post(
 
     driver = webdriver.Chrome(options=options)
 
-    # 5초 -> 15초로 상향. 사이트가 평소보다 느려지는 순간에도
-    # 여유를 두고 기다리도록 함. 평소 로딩 속도에는 영향 없음.
+    # 사이트가 평소보다 느려지는 순간에도 여유를 두고 기다리도록 함.
+    # 평소 로딩 속도에는 영향 없음.
     wait = WebDriverWait(driver, 15)
 
     try:
@@ -109,14 +109,10 @@ def modify_post(
         t = time.perf_counter()
 
         # ============================================
-        # 수정 페이지 이동
+        # 수정 페이지 이동, HTML 모드
         # ============================================
 
         driver.get(modify_url)
-
-        # ============================================
-        # HTML 모드
-        # ============================================
 
         html_button = wait.until(
             EC.element_to_be_clickable(
@@ -159,7 +155,7 @@ def modify_post(
         )
 
         # ============================================
-        # send_keys() 대신 JavaScript로 직접 주입
+        # JavaScript로 직접 주입
         # ============================================
 
         driver.execute_script(
