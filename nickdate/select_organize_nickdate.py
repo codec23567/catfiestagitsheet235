@@ -8,15 +8,12 @@ from google.oauth2.service_account import Credentials
 from nickdate_test import extract_nickdate
 from concurrent.futures import ThreadPoolExecutor
 
-# 프로그램 시작 시간
 program_start = time.time()
 
-# Google Sheets API 권한
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets"
 ]
 
-# GitHub Secret에 저장한 서비스 계정 정보로 인증
 credentials = Credentials.from_service_account_info(
     json.loads(os.environ["GOOGLE_CREDENTIALS"]),
     scopes=SCOPES
@@ -24,7 +21,6 @@ credentials = Credentials.from_service_account_info(
 
 gc = gspread.authorize(credentials)
 
-# 작업할 스프레드시트 열기
 spreadsheet = gc.open_by_key(
     "13Hp2IqBFzHE5L4xqGpieu-GVu0mA79fV06xYuFfnSB0"
 )
@@ -33,26 +29,24 @@ worksheet = spreadsheet.worksheet(
     os.environ["TARGET_SHEET"]
 )
 
-# 실제 데이터가 시작되는 행
+# 1~4행은 헤더/설정용이라 실제 데이터는 5행부터 시작
 start_row = 5
 
-# C열(URL), F열(날짜), G열(작성자) 읽기
+# C열(URL), F열(날짜), G열(작성자)
 urls = worksheet.col_values(3)
 dates = worksheet.col_values(6)
 authors = worksheet.col_values(7)
 
-# F/G열 길이가 부족하면 빈 문자열로 맞춰줌
+# gspread가 뒷부분 빈 셀은 반환하지 않으므로 urls 길이에 맞춰 채운다
 while len(dates) < len(urls):
     dates.append("")
 
 while len(authors) < len(urls):
     authors.append("")
 
-# 크롤링 대상 URL과 행 번호 저장
 requests = []
 target_rows = []
 
-# 크롤링 대상 찾기
 for row in range(start_row, len(urls) + 1):
 
     url = urls[row - 1].strip()
@@ -60,21 +54,16 @@ for row in range(start_row, len(urls) + 1):
     date = dates[row - 1] if row - 1 < len(dates) else ""
     author = authors[row - 1] if row - 1 < len(authors) else ""
 
-    # URL이 없으면 건너뜀
     if not url:
         continue
 
-    # 디시인사이드 URL만 처리
     if "dcinside" not in url:
         continue
 
-    # 날짜나 작성자가 비어있는 경우
+    # 아직 크롤링 안 됨(날짜/작성자 비어있음) 또는 지난 실행에서 실패해 "retry"로 남은 경우
     is_clear = (date == "") or (author == "")
-
-    # 이전 실행에서 retry로 남은 경우
     is_retry = (date == "retry")
 
-    # 크롤링 대상 추가
     if is_clear or is_retry:
         requests.append(url)
         target_rows.append(row)
@@ -91,7 +80,6 @@ for row, url in zip(target_rows, requests):
 MAX_RETRIES = 3
 current_try = 0
 
-# 처음에는 전체 대상이 재시도 목록
 pending_requests = requests[:]
 pending_rows = target_rows[:]
 
@@ -101,8 +89,7 @@ while pending_requests and current_try < MAX_RETRIES:
 
     batch_start = time.time()
 
-    # 병렬 크롤링
-    # [변경] max_workers 20 -> 4 (동시성 낮춤)
+    # 동시 요청 부하를 줄이기 위해 worker 수를 낮게 유지
     with ThreadPoolExecutor(max_workers=4) as executor:
         results = list(executor.map(extract_nickdate, pending_requests))
 
@@ -114,32 +101,26 @@ while pending_requests and current_try < MAX_RETRIES:
         flush=True
     )
 
-    # 다음 재시도 대상
     next_pending_requests = []
     next_pending_rows = []
 
-    # 결과 처리
     for row, url, result in zip(pending_rows, pending_requests, results):
 
-        # 삭제된 게시물
         if result["deleted"]:
             dates[row - 1] = "삭제됨"
             authors[row - 1] = ""
             continue
 
-        # 정상 크롤링 성공
         if result["date"] and result["author"]:
             dates[row - 1] = result["date"]
             authors[row - 1] = result["author"]
             continue
 
-        # 실패 → 다음 재시도 목록으로 이동
         print(f"재시도 대상 : {url}")
 
         next_pending_requests.append(url)
         next_pending_rows.append(row)
 
-    # 다음 반복에서 실패한 URL만 다시 시도
     pending_requests = next_pending_requests
     pending_rows = next_pending_rows
 
@@ -162,7 +143,6 @@ sheet_start = time.time()
 date_values = [[d] for d in dates[start_row - 1:]]
 author_values = [[a] for a in authors[start_row - 1:]]
 
-# [새 구조] 날짜 -> F열, 작성자 -> G열
 worksheet.update(
     range_name=f"F{start_row}:F{start_row + len(date_values) - 1}",
     values=date_values
@@ -187,12 +167,9 @@ print(
 
 print("완료")
 
-# ---------------------------------------------
-# [추가] 3회 재시도 후에도 끝내 실패한 항목이 있으면 실패로 알림
+# 3회 재시도 후에도 실패한 항목이 있으면 실패로 종료
 # -> webhook.py가 감지해서 깃허브 백업으로 전환 가능
-# "retry" 표시 자체는 그대로 남아서, 다음 실행 때도 재시도 대상이 된다.
-# ---------------------------------------------
-
+# "retry" 표시는 그대로 남아서 다음 실행 때도 재시도 대상이 된다
 if pending_rows:
     print(
         f"[경고] {len(pending_rows)}개 항목이 "
