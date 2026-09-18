@@ -1,16 +1,3 @@
-"""
-디시인사이드 로그인 + 게시글 HTML 수정 공통 모듈
-
-기존 modify_html_ver/login_modify_html.py 와
-modify_normal_ver/login_modify_normal.py 가 100% 동일한 로직이었기 때문에
-이 파일 하나로 통합했습니다.
-
-사용하는 쪽(read_host_html_unity.py)에서는 그냥 이렇게 import 해서 씁니다:
-
-    from login_modify_html_unity import modify_post
-    result = modify_post(user_id, user_pw, modify_url, html)
-"""
-
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
