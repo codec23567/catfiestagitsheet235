@@ -1,9 +1,9 @@
 import csv
 import re
 import time
-from collections import defaultdict
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 # ============================================================
@@ -12,15 +12,15 @@ from pathlib import Path
 
 SOURCE_FILE = "source.html"
 
-# 결과 파일
 OUTPUT_CSV = "battlecats_links.csv"
 OUTPUT_TXT = "battlecats_links.txt"
 
-# battlecats-db 링크로 인정할 도메인
 TARGET_DOMAIN = "battlecats-db.com"
 
-# ID 형식
-# 예: 076-1, 076-2, 123-1
+# 목차 링크: #s-3.1, #s-3.2, #s-4.1 ...
+TOC_PATTERN = re.compile(r"^#s-(\d+(?:\.\d+)+)$")
+
+# 캐릭터 ID: 076-1, 076-2, ...
 ID_PATTERN = re.compile(r"^\d+-\d+$")
 
 
@@ -89,7 +89,7 @@ class DOMParser(HTMLParser):
 
 
 # ============================================================
-# 텍스트 처리
+# 기본 유틸
 # ============================================================
 
 def normalize_text(text):
@@ -112,245 +112,339 @@ def get_node_text(node):
     return normalize_text(" ".join(parts))
 
 
-# ============================================================
-# battlecats 링크 찾기
-# ============================================================
-
-def is_target_url(url):
+def is_battlecats_url(url):
     if not url:
         return False
 
-    return TARGET_DOMAIN in url.lower()
+    try:
+        host = urlparse(url).netloc.lower()
+        return (
+            host == TARGET_DOMAIN
+            or host.endswith("." + TARGET_DOMAIN)
+        )
+    except Exception:
+        return TARGET_DOMAIN in url.lower()
 
 
-def extract_links(parser):
+def is_character_id(text):
+    return bool(
+        text and ID_PATTERN.fullmatch(normalize_text(text))
+    )
+
+
+# ============================================================
+# 문서 순서대로 모든 a 태그 가져오기
+# ============================================================
+
+def get_anchor_nodes(parser):
+    return [
+        node
+        for node in parser.all_nodes
+        if node.tag == "a"
+    ]
+
+
+# ============================================================
+# 목차에서 캐릭터 목록 추출
+# ============================================================
+
+def extract_toc_characters(parser):
     """
-    source.html 전체에서 battlecats-db 링크를 찾는다.
+    목차에 있는 #s-3.1, #s-3.2, #s-4.1 ...
+    링크를 그대로 캐릭터 목록으로 사용한다.
 
-    결과:
-        [
-            {
-                "id": "076-1",
-                "url": "https://battlecats-db.com/unit/076.html",
-                "link_text": "076-1",
-                "node": Node(...)
-            },
-            ...
-        ]
+    예:
+        #s-3.1 -> 바람의 신・윈디
+        #s-3.2 -> 번개의 신・산디아
     """
 
-    results = []
+    characters = []
 
-    for node in parser.all_nodes:
-        if node.tag != "a":
-            continue
-
+    for node in get_anchor_nodes(parser):
         href = node.attrs.get("href", "")
+        match = TOC_PATTERN.fullmatch(href.strip())
 
-        if not is_target_url(href):
+        if not match:
             continue
 
-        link_text = get_node_text(node)
+        section_id = match.group(1)
+        name = get_node_text(node)
 
-        # 실제 캐릭터 ID가 링크 텍스트인 경우를 우선 처리
-        character_id = None
+        # 목차 번호는 href에 있으므로 텍스트에서 제거
+        name = re.sub(
+            r"^\s*\d+(?:\.\d+)*\.?\s*",
+            "",
+            name
+        ).strip()
 
-        if ID_PATTERN.match(link_text):
-            character_id = link_text
+        if not name:
+            continue
 
-        results.append({
-            "id": character_id,
-            "url": href,
-            "link_text": link_text,
+        characters.append({
+            "section": section_id,
+            "name": name,
             "node": node,
         })
 
-    return results
-
-
-# ============================================================
-# 캐릭터 이름 추정
-# ============================================================
-
-def find_nearest_character_name(node):
-    """
-    battlecats 링크에서 가까운 부모 영역을 따라가면서
-    캐릭터 이름을 찾는다.
-
-    우선순위:
-    1. 가장 가까운 h1~h6
-    2. 가까운 부모 영역의 텍스트 중 후보
-    3. 없으면 빈 문자열
-
-    현재 페이지 구조에 특정 class 이름을 사용하지 않는다.
-    """
-
-    current = node.parent
-
-    for _ in range(20):
-        if current is None:
-            break
-
-        # 가까운 heading
-        if current.tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
-            text = get_node_text(current)
-
-            if text:
-                # "3.1. 바람의 신・윈디" 같은 경우
-                text = re.sub(
-                    r"^\s*\d+(?:\.\d+)*\.?\s*",
-                    "",
-                    text
-                )
-
-                return text.strip()
-
-        current = current.parent
-
-    return ""
-
-
-# ============================================================
-# 더 정확한 캐릭터 영역 추정
-# ============================================================
-
-def find_character_context(node):
-    """
-    링크 주변에서 캐릭터명 후보를 찾는다.
-
-    나무위키 구조가 페이지마다 조금 달라질 수 있기 때문에
-    특정 class 이름에 의존하지 않고 heading / 부모 구조를 사용한다.
-    """
-
-    # 먼저 heading을 찾는다.
-    heading_name = find_nearest_character_name(node)
-
-    if heading_name:
-        return heading_name
-
-    # heading이 바로 부모 구조에 없는 경우,
-    # 가까운 부모들의 텍스트에서 너무 큰 영역을 제외하고 후보를 찾는다.
-    current = node.parent
-
-    for _ in range(10):
-        if current is None:
-            break
-
-        text = get_node_text(current)
-
-        if 0 < len(text) <= 500:
-            lines = [
-                normalize_text(x)
-                for x in re.split(r"[\n\r]+", text)
-                if normalize_text(x)
-            ]
-
-            if lines:
-                # ID 자체가 아닌 첫 번째 의미 있는 텍스트를 후보로 사용
-                for line in lines:
-                    if not ID_PATTERN.match(line):
-                        if "battlecats-db.com" not in line:
-                            return line
-
-        current = current.parent
-
-    return ""
-
-
-# ============================================================
-# 중복 제거
-# ============================================================
-
-def deduplicate_links(results):
-    """
-    동일한 ID + URL은 한 번만 남긴다.
-    """
-
-    seen = set()
+    # 같은 section이 중복으로 들어오는 경우 제거
     unique = []
+    seen = set()
 
-    for item in results:
-        key = (
-            item["id"] or "",
-            item["url"]
-        )
-
-        if key in seen:
+    for item in characters:
+        if item["section"] in seen:
             continue
 
-        seen.add(key)
+        seen.add(item["section"])
         unique.append(item)
 
     return unique
 
 
 # ============================================================
-# 결과 정리
+# 실제 본문의 heading 추출
 # ============================================================
 
-def build_records(results):
-    records = []
+def find_section_headings(parser, sections):
+    """
+    목차의 #s-X 링크와 실제 본문의 id="s-X" heading을 연결한다.
+    """
 
-    for item in results:
-        character_id = item["id"]
-        url = item["url"]
-        link_text = item["link_text"]
+    section_ids = {
+        item["section"]
+        for item in sections
+    }
 
-        character_name = find_character_context(
-            item["node"]
-        )
+    headings = {}
 
-        # 링크 텍스트가 ID가 아닌 경우에도 기록은 남긴다.
-        records.append({
-            "character_name": character_name,
-            "id": character_id or link_text,
-            "url": url,
+    for node in parser.all_nodes:
+        if node.tag not in {
+            "h1", "h2", "h3", "h4", "h5", "h6"
+        }:
+            continue
+
+        # heading 내부 또는 자식 a의 id를 확인
+        for child in [node] + node.children:
+            node_id = child.attrs.get("id", "")
+
+            if node_id in {
+                f"s-{section}"
+                for section in section_ids
+            }:
+                headings[node_id[2:]] = node
+                break
+
+    return headings
+
+
+# ============================================================
+# Node 순회
+# ============================================================
+
+def walk_nodes(node):
+    yield node
+
+    for child in node.children:
+        yield from walk_nodes(child)
+
+
+# ============================================================
+# heading의 다음 섹션까지 탐색
+# ============================================================
+
+def document_order_nodes(parser):
+    """
+    DOM tree를 문서 순서대로 1차원 배열로 만든다.
+    """
+
+    result = []
+
+    def walk(node):
+        for child in node.children:
+            result.append(child)
+            walk(child)
+
+    walk(parser.root)
+
+    return result
+
+
+def collect_battlecats_links_between_headings(
+    ordered_nodes,
+    heading_node,
+    next_heading_node=None
+):
+    """
+    현재 캐릭터 heading부터 다음 캐릭터 heading 직전까지
+    battlecats-db 링크를 모두 찾는다.
+
+    특정 class 이름에는 의존하지 않는다.
+    """
+
+    try:
+        start_index = ordered_nodes.index(heading_node)
+    except ValueError:
+        return []
+
+    if next_heading_node is not None:
+        try:
+            end_index = ordered_nodes.index(next_heading_node)
+        except ValueError:
+            end_index = len(ordered_nodes)
+    else:
+        end_index = len(ordered_nodes)
+
+    links = []
+
+    for node in ordered_nodes[start_index:end_index]:
+        if node.tag != "a":
+            continue
+
+        href = node.attrs.get("href", "")
+
+        if not is_battlecats_url(href):
+            continue
+
+        link_text = get_node_text(node)
+
+        # 광고 등 battlecats 일반 링크는 제외
+        if not is_character_id(link_text):
+            continue
+
+        links.append({
+            "id": normalize_text(link_text),
+            "url": href,
+            "node": node,
         })
 
-    return records
+    return links
 
 
 # ============================================================
-# 화면 출력
+# 최종 데이터 생성
 # ============================================================
 
-def print_results(records):
+def build_records(parser):
+    toc_characters = extract_toc_characters(parser)
+    heading_map = find_section_headings(
+        parser,
+        toc_characters
+    )
+
+    ordered_nodes = document_order_nodes(parser)
+
+    records = []
+
+    for index, character in enumerate(toc_characters):
+        section = character["section"]
+        name = character["name"]
+
+        heading = heading_map.get(section)
+
+        if heading is None:
+            print(
+                f"[경고] 본문 heading을 찾지 못함: "
+                f"{section} {name}"
+            )
+            continue
+
+        # 다음 목차 항목의 본문 heading
+        next_heading = None
+
+        for next_character in toc_characters[index + 1:]:
+            candidate = heading_map.get(
+                next_character["section"]
+            )
+
+            if candidate is not None:
+                next_heading = candidate
+                break
+
+        links = collect_battlecats_links_between_headings(
+            ordered_nodes,
+            heading,
+            next_heading
+        )
+
+        for link in links:
+            records.append({
+                "character_name": name,
+                "section": section,
+                "id": link["id"],
+                "url": link["url"],
+            })
+
+        print(
+            f"[매칭] {section}. {name} "
+            f"→ {len(links)}개 ID"
+        )
+
+    return records, toc_characters
+
+
+# ============================================================
+# 중복 제거
+# ============================================================
+
+def deduplicate_records(records):
+    seen = set()
+    result = []
+
+    for record in records:
+        key = (
+            record["character_name"],
+            record["section"],
+            record["id"],
+            record["url"],
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        result.append(record)
+
+    return result
+
+
+# ============================================================
+# 결과 출력
+# ============================================================
+
+def print_results(records, toc_characters):
     print()
     print("=" * 80)
-    print("battlecats-db 캐릭터 링크")
+    print("캐릭터 + battlecats ID")
     print("=" * 80)
 
     if not records:
-        print("battlecats-db 링크를 찾지 못했습니다.")
+        print("추출된 캐릭터 ID가 없습니다.")
         return
 
-    for index, record in enumerate(records, start=1):
-        name = record["character_name"] or "(캐릭터명 확인 필요)"
+    current_section = None
+
+    for record in records:
+        if record["section"] != current_section:
+            current_section = record["section"]
+
+            print()
+            print(
+                f"[{record['section']}] "
+                f"{record['character_name']}"
+            )
 
         print(
-            f"[{index:3}] "
-            f"{name} | "
-            f"{record['id']}"
-        )
-
-        print(
-            f"      {record['url']}"
+            f"    {record['id']} "
+            f"→ {record['url']}"
         )
 
     print()
     print("-" * 80)
-    print(f"총 링크 수 : {len(records):,}")
-
-    valid_ids = [
-        record for record in records
-        if ID_PATTERN.match(record["id"])
-    ]
-
-    print(f"ID 형식 확인 : {len(valid_ids):,}")
+    print(f"목차 캐릭터 수 : {len(toc_characters):,}")
+    print(f"추출 ID 수     : {len(records):,}")
 
 
 # ============================================================
-# CSV 저장
+# CSV
 # ============================================================
 
 def save_csv(records):
@@ -364,6 +458,7 @@ def save_csv(records):
             f,
             fieldnames=[
                 "character_name",
+                "section",
                 "id",
                 "url",
             ]
@@ -372,13 +467,11 @@ def save_csv(records):
         writer.writeheader()
         writer.writerows(records)
 
-    print(
-        f"[저장] CSV : {OUTPUT_CSV}"
-    )
+    print(f"[저장] CSV : {OUTPUT_CSV}")
 
 
 # ============================================================
-# TXT 저장
+# TXT
 # ============================================================
 
 def save_txt(records):
@@ -390,73 +483,16 @@ def save_txt(records):
         for record in records:
             f.write(
                 f"{record['character_name']}\t"
+                f"{record['section']}\t"
                 f"{record['id']}\t"
                 f"{record['url']}\n"
             )
 
-    print(
-        f"[저장] TXT : {OUTPUT_TXT}"
-    )
+    print(f"[저장] TXT : {OUTPUT_TXT}")
 
 
 # ============================================================
-# 페이지별 캐릭터 요약
-# ============================================================
-
-def print_group_summary(records):
-    """
-    ID의 앞부분을 기준으로 묶는다.
-
-    예:
-        076-1
-        076-2
-        076-3
-
-    -> 076 그룹
-    """
-
-    groups = defaultdict(list)
-
-    for record in records:
-        match = re.match(
-            r"^(\d+)-(\d+)$",
-            record["id"]
-        )
-
-        if not match:
-            continue
-
-        unit_number = match.group(1)
-        groups[unit_number].append(record)
-
-    print()
-    print("=" * 80)
-    print("캐릭터 번호별 진화 형태 요약")
-    print("=" * 80)
-
-    for unit_number, items in groups.items():
-        ids = [item["id"] for item in items]
-
-        names = [
-            item["character_name"]
-            for item in items
-            if item["character_name"]
-        ]
-
-        name = names[0] if names else "(캐릭터명 확인 필요)"
-
-        print(
-            f"{unit_number} | "
-            f"{name} | "
-            f"{', '.join(ids)}"
-        )
-
-    print()
-    print(f"캐릭터 그룹 수 : {len(groups):,}")
-
-
-# ============================================================
-# source.html 읽기
+# source.html
 # ============================================================
 
 def load_source():
@@ -471,24 +507,15 @@ def load_source():
         )
         raise SystemExit(1)
 
-    try:
-        data = path.read_bytes()
+    data = path.read_bytes()
 
-        if data.startswith(b"\xef\xbb\xbf"):
-            return data.decode(
-                "utf-8-sig"
-            )
+    if data.startswith(b"\xef\xbb\xbf"):
+        return data.decode("utf-8-sig")
 
-        return data.decode(
-            "utf-8",
-            errors="replace"
-        )
-
-    except Exception as e:
-        print(
-            f"[오류] HTML 읽기 실패: {e}"
-        )
-        raise SystemExit(1)
+    return data.decode(
+        "utf-8",
+        errors="replace"
+    )
 
 
 # ============================================================
@@ -498,9 +525,7 @@ def load_source():
 def main():
     start_time = time.time()
 
-    print(
-        f"[읽기] {SOURCE_FILE}"
-    )
+    print(f"[읽기] {SOURCE_FILE}")
 
     html = load_source()
 
@@ -508,9 +533,7 @@ def main():
         f"[정보] HTML 크기 : {len(html):,} 문자"
     )
 
-    print(
-        "[분석] HTML 파싱 중..."
-    )
+    print("[분석] HTML 파싱 중...")
 
     parser = DOMParser()
     parser.feed(html)
@@ -520,25 +543,18 @@ def main():
     )
 
     print(
-        "[검색] battlecats-db 링크 검색 중..."
+        "[추출] 목차의 캐릭터 목록과 "
+        "본문의 battlecats ID 연결 중..."
     )
 
-    results = extract_links(parser)
+    records, toc_characters = build_records(parser)
 
-    print(
-        f"[검색] 발견 : {len(results):,}개"
+    records = deduplicate_records(records)
+
+    print_results(
+        records,
+        toc_characters
     )
-
-    results = deduplicate_links(results)
-
-    print(
-        f"[정리] 중복 제거 후 : {len(results):,}개"
-    )
-
-    records = build_records(results)
-
-    print_results(records)
-    print_group_summary(records)
 
     save_csv(records)
     save_txt(records)
