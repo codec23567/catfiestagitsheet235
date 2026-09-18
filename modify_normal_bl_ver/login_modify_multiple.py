@@ -25,7 +25,7 @@ def create_driver():
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
 
-    # Chrome 최적화
+    # Chrome 실행 속도를 위한 부가 기능 비활성화
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-background-networking")
@@ -96,14 +96,14 @@ def modify_post(driver, modify_url, text):
     start = time.perf_counter()
     t = time.perf_counter()
 
-    # [변경] 5초 -> 15초
     wait = WebDriverWait(driver, 15)
     short_wait = WebDriverWait(driver, 20)
 
+    # html_button을 누를 때마다 HTML 모드 ⇄ 일반 에디터 모드가 토글된다.
+    # HTML 모드에서 본문을 직접 조작한 뒤에는 다시 눌러 일반 모드로 복귀한다.
+
     try:
-        # ============================================
         # 수정 페이지 이동
-        # ============================================
         driver.get(modify_url)
 
         html_button = wait.until(
@@ -118,9 +118,7 @@ def modify_post(driver, modify_url, text):
         )
         t = time.perf_counter()
 
-        # ============================================
         # 기존 본문 삭제
-        # ============================================
         html_button.click()
 
         html_area = wait.until(
@@ -131,7 +129,6 @@ def modify_post(driver, modify_url, text):
 
         html_area.clear()
 
-        # 일반 에디터 모드로 복귀
         html_button.click()
 
         editor = wait.until(
@@ -140,32 +137,25 @@ def modify_post(driver, modify_url, text):
             )
         )
 
-        # 에디터 맨 끝으로 이동
+        # 커서를 맨 끝으로 이동
         editor.click()
         editor.send_keys(Keys.CONTROL, Keys.END)
 
-        # 한 줄 전체가 URL인 경우에만 OG 카드 생성
+        # 한 줄 전체가 URL인 경우에만 OG 카드를 생성한다
         url_pattern = re.compile(r"^https?://\S+$")
         lines = text.splitlines()
 
-        # ============================================
-        # 본문 입력
-        # ============================================
         for index, line in enumerate(lines):
             is_url = bool(url_pattern.fullmatch(line.strip()))
             is_last_line = index == len(lines) - 1
 
             print(f"입력: [{line}]", flush=True)
 
-            # ==================================================
-            # ① URL이 아닌 일반 텍스트
-            # ==================================================
+            # 일반 텍스트
             if not is_url:
 
-                # ----------------------------------------------
-                # 빈 줄
-                # ----------------------------------------------
                 if not line:
+                    # 빈 줄 → <p><br></p> 삽입
                     html_button.click()
 
                     html_area = wait.until(
@@ -202,13 +192,9 @@ def modify_post(driver, modify_url, text):
                     editor.click()
                     editor.send_keys(Keys.CONTROL, Keys.END)
 
-                # ----------------------------------------------
-                # 일반 텍스트
-                # 22pt + Bold
-                # ----------------------------------------------
                 else:
-                    # HTML 특수문자 안전 처리
-                    escaped_line = html.escape(line)
+                    # 일반 텍스트: 22pt + Bold로 스타일 추가
+                    escaped_line = html.escape(line)  # HTML 특수문자 안전 처리
 
                     styled_html = (
                         '<p>'
@@ -219,7 +205,6 @@ def modify_post(driver, modify_url, text):
                         '</p>'
                     )
 
-                    # HTML 모드로 전환
                     html_button.click()
 
                     html_area = wait.until(
@@ -228,7 +213,6 @@ def modify_post(driver, modify_url, text):
                         )
                     )
 
-                    # 기존 HTML 맨 뒤에 일반 텍스트를 HTML로 추가
                     driver.execute_script(
                         """
                         const area = arguments[0];
@@ -248,7 +232,6 @@ def modify_post(driver, modify_url, text):
                         styled_html,
                     )
 
-                    # 일반 에디터 모드로 복귀
                     html_button.click()
 
                     editor = wait.until(
@@ -263,12 +246,10 @@ def modify_post(driver, modify_url, text):
 
                 continue
 
-            # ==================================================
-            # ② URL
-            # ==================================================
+            # URL: 일반 에디터에서 그대로 입력해 OG 카드를 생성한다
             print("URL 발견 - OG 카드 생성 시작", flush=True)
 
-            # 현재 OG 카드 개수 기록
+            # OG 카드 생성 여부를 확인하기 위해 현재 개수를 먼저 기록
             og_count_before = len(
                 driver.find_elements(
                     By.CSS_SELECTOR,
@@ -276,20 +257,14 @@ def modify_post(driver, modify_url, text):
                 )
             )
 
-            # ----------------------------------------------
-            # URL은 기존처럼 일반 에디터에서 입력
-            # ----------------------------------------------
             editor.click()
             editor.send_keys(line)
 
-            # OG 카드 생성
             driver.execute_script(
                 "oglink('paste', false, '');"
             )
 
-            # ----------------------------------------------
-            # 새로운 OG 카드가 실제로 추가될 때까지 대기
-            # ----------------------------------------------
+            # 새로운 OG 카드가 실제로 추가될 때까지 대기 (호출 성공 != 생성 성공)
             try:
                 short_wait.until(
                     lambda d: len(
@@ -329,9 +304,7 @@ def modify_post(driver, modify_url, text):
 
             print("OG 생성 완료", flush=True)
 
-            # ==================================================
             # URL 뒤에 다음 내용이 있으면 빈 문단 추가
-            # ==================================================
             if not is_last_line:
 
                 html_button.click()
@@ -367,8 +340,6 @@ def modify_post(driver, modify_url, text):
                     )
                 )
 
-                # HTML 모드에서 빠져나온 후
-                # 다음 입력 위치를 확실하게 맨 끝으로 이동
                 editor.click()
                 editor.send_keys(Keys.CONTROL, Keys.END)
 
@@ -382,9 +353,7 @@ def modify_post(driver, modify_url, text):
         )
         t = time.perf_counter()
 
-        # ============================================
-        # 저장 전 HTML 확인
-        # ============================================
+        # 저장 전 디버그용 HTML 로그
         html_button.click()
 
         html_area = wait.until(
@@ -403,7 +372,6 @@ def modify_post(driver, modify_url, text):
             flush=True,
         )
 
-        # 저장 전 일반 에디터 모드로 복귀
         html_button.click()
 
         wait.until(
@@ -412,9 +380,7 @@ def modify_post(driver, modify_url, text):
             )
         )
 
-        # ============================================
-        # 수정 버튼 클릭
-        # ============================================
+        # 저장 버튼 클릭
         write_button = wait.until(
             EC.element_to_be_clickable(
                 (By.CSS_SELECTOR, "button.btn_blue.write"),
@@ -426,27 +392,19 @@ def modify_post(driver, modify_url, text):
 
         write_button.click()
 
-        # ============================================
-        # 저장 버튼 클릭 직후 상태 확인
-        # ============================================
-
         # 최종적으로 저장이 성공했다고 볼 수 있는지 여부.
         # 아래 확인 과정에서 문제가 발견되면 False로 바뀐다.
-        
         save_confirmed = False
         failure_reason = None
 
         # "확실히 정상적인 절차의 일부"라고 알려진 경고창 문구 목록.
         # 여기 있는 것만 안전하게 통과시킨다.
         # 새로운 정상 경고창을 발견하면 이 목록에 문구(일부)를 추가하면 된다.
-        
         SAFE_ALERT_KEYWORDS = [
             "유튜브 링크가 포함되어 있습니다",
         ]
 
-        # --------------------------------------------
         # 1) 브라우저 네이티브 alert(경고창) 발생 여부 확인
-        # --------------------------------------------
         try:
             alert = WebDriverWait(driver, 3).until(
                 EC.alert_is_present()
@@ -456,9 +414,8 @@ def modify_post(driver, modify_url, text):
             alert.accept()
 
             # 알려진 안전한 경고창(예: 유튜브 링크 변환 확인창)이면
-            # 그냥 확인만 하고 정상 진행. 그 외 낯선 경고창은 무슨 뜻인지
+            # 확인만 하고 정상 진행. 그 외 낯선 경고창은 무슨 뜻인지
             # 모르므로 안전하게 실패로 처리.
-            
             if any(keyword in alert_text for keyword in SAFE_ALERT_KEYWORDS):
                 print(
                     "[정상 절차로 확인된 경고창] "
@@ -473,9 +430,7 @@ def modify_post(driver, modify_url, text):
         except Exception:
             print("[경고창 없음]", flush=True)
 
-        # --------------------------------------------
         # 2) URL 변경 여부 확인 (저장 성공 시 상세 페이지로 이동)
-        # --------------------------------------------
         try:
             WebDriverWait(driver, 10).until(
                 EC.url_changes(before_url)
@@ -486,7 +441,7 @@ def modify_post(driver, modify_url, text):
                 flush=True,
             )
 
-            # [추가] URL이 실제로 바뀌었다면 저장 성공으로 간주
+            # URL이 바뀌었다면 저장 성공으로 간주
             save_confirmed = True
 
         except Exception:
@@ -495,10 +450,8 @@ def modify_post(driver, modify_url, text):
                 flush=True,
             )
 
-            # --------------------------------------------
             # 3) URL이 안 바뀐 경우, 페이지 내 에러 메시지 확인
             #    (실제 마크업에 맞게 선택자 조정 필요)
-            # --------------------------------------------
             error_elements = driver.find_elements(
                 By.CSS_SELECTOR,
                 ".error_msg, .alert_msg, .layer_error",
@@ -524,9 +477,7 @@ def modify_post(driver, modify_url, text):
                         "저장 후 URL 변경 확인 실패 (에러 메시지도 없음)"
                     )
 
-        # --------------------------------------------
         # 4) 최종 상태 로그
-        # --------------------------------------------
         print(f"[최종 페이지 제목] {driver.title}", flush=True)
         print(f"[최종 URL] {driver.current_url}", flush=True)
 
