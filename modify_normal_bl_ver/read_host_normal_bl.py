@@ -38,7 +38,7 @@ user_pw = os.environ["CAT_PW"]
 def to_modify_url(url):
     url = str(url or "").strip()
 
-    # 모바일 게시글 URL 형식 예시: https://m.dcinside.com/....
+    # 모바일 게시글 URL 예시: https://m.dcinside.com/....
     match = re.fullmatch(
         r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
         url,
