@@ -15,7 +15,7 @@ from workflow_config import WORKFLOW_CELLS
 def to_modify_url(url):
     url = str(url or "").strip()
 
-    # 모바일 게시글 URL 형식: https://m.dcinside.com/board/catfiesta/58
+    # 모바일 게시글 URL 형식 예시 : https://m.dcinside.com/board/...
     match = re.fullmatch(
         r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
         url,
