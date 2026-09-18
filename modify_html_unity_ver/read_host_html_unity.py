@@ -12,15 +12,10 @@ from login_modify_html_unity import modify_post
 from workflow_config import WORKFLOW_CELLS
 
 
-# -------------------------------------------------
-# 모바일 게시글 URL → PC 수정 URL 변환
-# -------------------------------------------------
-
 def to_modify_url(url):
     url = str(url or "").strip()
 
-    # 모바일 게시글 URL
-    # https://m.dcinside.com/board/catfiesta/58
+    # 모바일 게시글 URL 형식: https://m.dcinside.com/board/catfiesta/58
     match = re.fullmatch(
         r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
         url,
@@ -35,7 +30,7 @@ def to_modify_url(url):
             f"?id={gallery_id}&no={post_no}"
         )
 
-    # 이미 PC 수정 URL인 경우 등은 그대로 사용
+    # 이미 PC 수정 URL인 경우 등은 변환하지 않고 그대로 사용
     return url
 
 
@@ -46,10 +41,6 @@ def run(workflow_name):
         sys.exit(1)
 
     cells = WORKFLOW_CELLS[workflow_name]
-
-    # -------------------------------------------------
-    # Google Sheets 인증
-    # -------------------------------------------------
 
     SCOPES = [
         "https://www.googleapis.com/auth/spreadsheets"
@@ -70,16 +61,8 @@ def run(workflow_name):
         os.environ["TARGET_SHEET"]
     )
 
-    # -------------------------------------------------
-    # 로그인 정보
-    # -------------------------------------------------
-
     user_id = os.environ["CAT_ID"]
     user_pw = os.environ["CAT_PW"]
-
-    # -------------------------------------------------
-    # 실행 상태 기록
-    # -------------------------------------------------
 
     worksheet.update(
         range_name=cells["status_cell"],
@@ -87,10 +70,6 @@ def run(workflow_name):
     )
 
     print("실행중")
-
-    # -------------------------------------------------
-    # 시트 데이터 읽기
-    # -------------------------------------------------
 
     modify_url = worksheet.acell(cells["url_cell"]).value
 
@@ -101,7 +80,6 @@ def run(workflow_name):
 
     html = worksheet.acell(cells["html_cell"]).value or ""
 
-    # URL이 없으면 종료
     # "정상적으로 할 일이 없어서 끝남"이 아니라
     # 원래 있어야 할 URL이 없는 비정상 상황이므로 실패로 처리한다.
     if not modify_url:
@@ -112,19 +90,11 @@ def run(workflow_name):
             values=[["실패 : 수정 URL이 없습니다."]]
         )
 
-        sys.exit(1)  # 실패로 알림
-
-    # -------------------------------------------------
-    # 수정 URL 변환
-    # -------------------------------------------------
+        sys.exit(1)
 
     modify_url = to_modify_url(modify_url)
 
     print(f"수정 URL: {modify_url}")
-
-    # -------------------------------------------------
-    # 게시글 수정
-    # -------------------------------------------------
 
     result = modify_post(
         user_id,
@@ -132,10 +102,6 @@ def run(workflow_name):
         modify_url,
         html
     )
-
-    # -------------------------------------------------
-    # 결과 기록
-    # -------------------------------------------------
 
     if result["success"]:
 
@@ -167,7 +133,7 @@ def run(workflow_name):
 
         print(f"실패 : {message}")
 
-        sys.exit(1)  # 실패로 알림 -> webhook.py가 감지해서 깃허브로 전환 가능
+        sys.exit(1)  # webhook.py가 감지해서 깃허브 백업으로 전환 가능
 
 
 if __name__ == "__main__":
