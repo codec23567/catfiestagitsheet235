@@ -11,10 +11,7 @@ from google.oauth2.service_account import Credentials
 from login_modify_multiple import create_driver, login, modify_post
 
 
-# -------------------------------------------------
 # Google Sheets 인증
-# -------------------------------------------------
-
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets"
 ]
@@ -34,24 +31,14 @@ worksheet = spreadsheet.worksheet(
     os.environ["TARGET_SHEET"]
 )
 
-
-# -------------------------------------------------
-# GitHub Secrets
-# -------------------------------------------------
-
 user_id = os.environ["CAT_ID"]
 user_pw = os.environ["CAT_PW"]
 
 
-# -------------------------------------------------
-# URL 변환
-# -------------------------------------------------
-
 def to_modify_url(url):
     url = str(url or "").strip()
 
-    # 모바일 게시글 URL
-    # https://m.dcinside.com/board/catfiesta/58
+    # 모바일 게시글 URL 형식: https://m.dcinside.com/board/catfiesta/58
     match = re.fullmatch(
         r"https://m\.dcinside\.com/board/([^/]+)/(\d+)",
         url,
@@ -66,7 +53,7 @@ def to_modify_url(url):
             f"?id={gallery_id}&no={post_no}"
         )
 
-    # 이미 PC 수정 URL인 경우 등은 그대로 사용
+    # 이미 PC 수정 URL인 경우 등은 변환하지 않고 그대로 사용
     return url
 
 
@@ -86,7 +73,7 @@ H_COL = 8     # H열
 b_values = worksheet.col_values(NAME_COL)
 h_values = worksheet.col_values(H_COL)
 
-# 길이 보정
+# gspread가 뒷부분 빈 셀은 반환하지 않으므로 길이를 맞춰준다
 last_row = max(len(b_values), len(h_values), START_ROW)
 while len(b_values) < last_row:
     b_values.append("")
@@ -99,7 +86,7 @@ for idx in range(START_ROW - 1, last_row):
     name = str(b_values[idx]).strip() if idx < len(b_values) else ""
 
     if not name:
-        continue  # 그룹 시작 행이 아니면 건너뜀
+        continue  # 그룹 시작 행이 아님
 
     group_start_row = idx + 1  # 1-indexed 실제 시트 행 번호
 
@@ -117,7 +104,7 @@ for idx in range(START_ROW - 1, last_row):
     )
 
     if date_value:
-        continue  # 완료 날짜가 있으면 이미 처리된 것으로 간주, 건너뜀
+        continue  # 완료 날짜가 있으면 이미 처리된 것으로 간주
 
     content_value = (
         str(h_values[content_idx]).strip()
@@ -154,34 +141,21 @@ for idx in range(START_ROW - 1, last_row):
         }
     )
 
-
-# -------------------------------------------------
-# 작업할 항목이 없으면 종료
-# -------------------------------------------------
-
 if not tasks:
     print("처리할 '모음집관리' 작업이 없습니다.", flush=True)
     raise SystemExit(0)
 
 print(f"처리할 작업 수: {len(tasks)}개", flush=True)
 
-
-# -------------------------------------------------
-# Chrome 실행 및 로그인: 전체 작업에서 1회
-# -------------------------------------------------
-
 driver = None
 
-# [추가] 이번 실행에서 실패한 항목이 하나라도 있었는지 기록
+# 이번 실행에서 실패한 항목이 하나라도 있었는지 기록
 any_failure = False
 
 try:
+    # Chrome 실행 및 로그인은 전체 작업에서 1회만 수행
     driver = create_driver()
     login(driver, user_id, user_pw)
-
-    # -------------------------------------------------
-    # 게시글 순차 수정
-    # -------------------------------------------------
 
     for task in tasks:
         name = task["name"]
@@ -195,7 +169,7 @@ try:
         )
         print(f"수정 URL: {modify_url}", flush=True)
 
-        # 작업 시작 상태 - 완료 날짜 셀에 임시로 "실행중" 기록
+        # 완료 날짜 셀에 임시로 "실행중" 기록
         worksheet.update(
             range_name=f"H{date_row}",
             values=[["실행중"]],
@@ -209,7 +183,6 @@ try:
             text,
         )
 
-        # 성공한 경우: 완료 날짜 셀에 실제 완료 시각 기록
         if result.get("success", False):
 
             completed_at = datetime.now(
@@ -226,13 +199,13 @@ try:
                 flush=True,
             )
 
-        # 실패한 경우: 완료 날짜 셀을 다시 비워서 다음 실행 때 재시도 대상이 되게 함
         else:
             message = result.get(
                 "message",
                 "알 수 없는 오류",
             )
 
+            # 완료 날짜 셀을 다시 비워서 다음 실행 때 재시도 대상이 되게 함
             worksheet.update(
                 range_name=f"H{date_row}",
                 values=[[""]],
@@ -244,20 +217,17 @@ try:
                 flush=True,
             )
 
-            any_failure = True  # [추가] 실패 항목 있었음을 기록
+            any_failure = True
 
 finally:
     if driver:
         driver.quit()
         print("Chrome 종료", flush=True)
 
-# -------------------------------------------------
-# [추가] 실패한 항목이 하나라도 있었으면 비정상 종료로 알림
+# 실패한 항목이 하나라도 있었으면 비정상 종료로 알림
 # -> webhook.py가 이를 감지해서 실패로 응답 -> 깃허브 백업 전환 가능
 # 항목별 재시도(날짜칸 비우기)는 그대로 유지되므로, 다음 실행 때도
 # 이 항목은 다시 시도된다.
-# -------------------------------------------------
-
 if any_failure:
     print("일부 항목이 실패하여 비정상 종료로 표시합니다.", flush=True)
     sys.exit(1)
