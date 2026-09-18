@@ -35,7 +35,7 @@ def modify_post(
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
 
-    # Chrome 최적화
+    # Chrome 실행 속도를 위한 부가 기능 비활성화
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-background-networking")
@@ -65,10 +65,7 @@ def modify_post(
 
     try:
 
-        # ============================================
         # 로그인
-        # ============================================
-
         driver.get(LOGIN_URL)
 
         id_input = wait.until(
@@ -108,10 +105,7 @@ def modify_post(
 
         t = time.perf_counter()
 
-        # ============================================
-        # 수정 페이지 이동, HTML 모드
-        # ============================================
-
+        # 수정 페이지 이동, HTML 모드로 전환
         driver.get(modify_url)
 
         html_button = wait.until(
@@ -132,10 +126,6 @@ def modify_post(
 
         html_button.click()
 
-        # ============================================
-        # 본문 교체
-        # ============================================
-
         html_area = wait.until(
             EC.visibility_of_element_located(
                 (
@@ -145,7 +135,6 @@ def modify_post(
             )
         )
 
-        # HTML 크기 출력
         html_size_kb = len(html.encode("utf-8")) / 1024
 
         print(
@@ -154,10 +143,7 @@ def modify_post(
             flush=True
         )
 
-        # ============================================
-        # JavaScript로 직접 주입
-        # ============================================
-
+        # 본문 입력
         driver.execute_script(
             """
             arguments[0].value = arguments[1];
@@ -173,10 +159,6 @@ def modify_post(
             html_area,
             html
         )
-
-        # ============================================
-        # 실제 입력 결과 확인
-        # ============================================
 
         actual_length = driver.execute_script(
             "return arguments[0].value.length;",
@@ -203,10 +185,7 @@ def modify_post(
 
         t = time.perf_counter()
 
-        # ============================================
-        # 수정 버튼
-        # ============================================
-
+        # 저장
         write_button = wait.until(
             EC.element_to_be_clickable(
                 (
