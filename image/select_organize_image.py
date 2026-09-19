@@ -24,7 +24,8 @@ SITE_URL_MARKER = "catfiestasite"
 # 사이트의 캐릭터 카드에는 그 캐릭터의 모든 폼(1폼, 2폼, ...)이 들어 있다.
 # 시트 D열(육성도) 값을 보고 그중 하나만 고른다.
 #   - "2진", "3진", "4진" ... : N번째 폼 (폼 수보다 크면 경고 후 마지막 폼)
-#   - "초본", "본능", 빈 값   : 마지막(최종) 폼
+#   - "초본", "본능"          : 3번째 폼 (폼이 3개 미만이면 경고 후 마지막 폼)
+#   - 빈 값                   : 마지막(최종) 폼
 #   - 그 밖의 값              : 경고 후 마지막 폼
 # -------------------------------------------------
 
@@ -48,7 +49,19 @@ def pick_form(forms, d_value, name=""):
         )
         return forms[-1]
 
-    if d_value in ("", "초본", "본능"):
+    if d_value in ("초본", "본능"):
+
+        if len(forms) >= 3:
+            return forms[2]
+
+        print(
+            f"[경고] {name} : '{d_value}' 인데 폼이 {len(forms)}개뿐이라 "
+            f"마지막 폼을 넣습니다",
+            flush=True
+        )
+        return forms[-1]
+
+    if d_value == "":
         return forms[-1]
 
     print(
