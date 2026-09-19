@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import sys
 
@@ -12,6 +13,49 @@ from regex_test import extract_images
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets"
 ]
+
+# K3:T3 링크 중 이 글자가 들어 있는 링크(우리 사이트 catfiestasite 페이지)만 대상으로 한다
+SITE_URL_MARKER = "catfiestasite"
+
+
+# -------------------------------------------------
+# 폼 고르기
+# -------------------------------------------------
+# 사이트의 캐릭터 카드에는 그 캐릭터의 모든 폼(1폼, 2폼, ...)이 들어 있다.
+# 시트 D열(육성도) 값을 보고 그중 하나만 고른다.
+#   - "2진", "3진", "4진" ... : N번째 폼 (폼 수보다 크면 경고 후 마지막 폼)
+#   - "초본", "본능", 빈 값   : 마지막(최종) 폼
+#   - 그 밖의 값              : 경고 후 마지막 폼
+# -------------------------------------------------
+
+def pick_form(forms, d_value, name=""):
+
+    d_value = str(d_value or "").strip()
+
+    match = re.fullmatch(r"(\d+)진", d_value)
+
+    if match:
+
+        number = int(match.group(1))
+
+        if 1 <= number <= len(forms):
+            return forms[number - 1]
+
+        print(
+            f"[경고] {name} : '{d_value}' 인데 폼이 {len(forms)}개뿐이라 "
+            f"마지막 폼을 넣습니다",
+            flush=True
+        )
+        return forms[-1]
+
+    if d_value in ("", "초본", "본능"):
+        return forms[-1]
+
+    print(
+        f"[경고] {name} : 알 수 없는 육성도 '{d_value}' 이라 마지막 폼을 넣습니다",
+        flush=True
+    )
+    return forms[-1]
 
 credentials = Credentials.from_service_account_info(
     json.loads(os.environ["GOOGLE_CREDENTIALS"]),
@@ -50,7 +94,7 @@ for col in range(11, 21):
     if not url:
         continue
 
-    if "dcinside" not in url:
+    if SITE_URL_MARKER not in url:
         continue
 
     target_urls.append(url)
@@ -140,28 +184,30 @@ if suspicious_empty_urls:
     sys.exit(1)  # webhook.py가 감지 -> GitHub 백업으로 전환
 
 # -------------------------------------------------
-# 원래 순서(target_urls) 그대로 이미지 리스트 조립
+# 원래 순서(target_urls) 그대로 캐릭터 리스트 조립
+# -------------------------------------------------
+# character_list[n] = n번째 캐릭터의 폼 목록 (예: [1폼, 2폼, 3폼])
 # -------------------------------------------------
 
-img_list = []
+character_list = []
 
 for url in target_urls:
-    result = url_results.get(url, {"images": [], "deleted": False})
+    result = url_results.get(url, {"characters": [], "deleted": False})
 
     if result.get("deleted"):
         print(f"[삭제됨] {url}", flush=True)
-        continue  # 삭제된 글은 이미지 0개로 확정, 리스트에 추가하지 않음
+        continue  # 삭제된 페이지는 캐릭터 0명으로 확정, 리스트에 추가하지 않음
 
-    img_list.extend(result.get("images", []))
+    character_list.extend(result.get("characters", []))
 
 # 위에서 "삭제 안 됐는데 이미지 0개"인 경우는 이미 걸러졌으므로,
-# 여기서 img_list가 비었다면 URL이 없었거나 전부 삭제된 글인 경우뿐이다
-if len(img_list) == 0:
-    img_list = ["본문 이미지 없음"]
+# 여기서 character_list가 비었다면 URL이 없었거나 전부 삭제된 페이지인 경우뿐이다
+if len(character_list) == 0:
+    character_list = [["본문 이미지 없음"]]
 
 
 # -------------------------------------------------
-# B/K/J 열 읽기
+# B/K/J/D 열 읽기 (D열 = 육성도, 어느 폼을 넣을지 정하는 데 쓴다)
 # -------------------------------------------------
 
 start_row = 5
@@ -185,6 +231,10 @@ j_values = worksheet.get(
     f"J{start_row}:J{last_row}"
 )
 
+d_values = worksheet.get(
+    f"D{start_row}:D{last_row}"
+)
+
 # gspread가 뒷부분 빈 행은 아예 반환하지 않으므로 num_rows에 맞춰 채워준다
 while len(b_values) < num_rows:
     b_values.append([""])
@@ -194,6 +244,9 @@ while len(k_values) < num_rows:
 
 while len(j_values) < num_rows:
     j_values.append([""])
+
+while len(d_values) < num_rows:
+    d_values.append([""])
 
 # J열의 빈 행은 [](빈 리스트)로 오므로 [""]로 맞춰준다
 for i in range(num_rows):
@@ -217,9 +270,15 @@ for i in range(num_rows):
 
         if k and str(k).strip():
 
-            if valid_b_count <= len(img_list):
+            if valid_b_count <= len(character_list):
 
-                j_values[i][0] = img_list[valid_b_count - 1]
+                d = d_values[i][0] if d_values[i] else ""
+
+                j_values[i][0] = pick_form(
+                    character_list[valid_b_count - 1],
+                    d,
+                    str(b).strip()
+                )
 
             else:
 
