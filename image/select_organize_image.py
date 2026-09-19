@@ -57,6 +57,34 @@ def pick_form(forms, d_value, name=""):
     )
     return forms[-1]
 
+
+# -------------------------------------------------
+# 육성도 찾기
+# -------------------------------------------------
+# 캐릭터의 링크 영역 = 캐릭터 이름(B열)이 있는 행부터
+# 다음 캐릭터 이름이 나오기 전까지의 행들.
+# 그 영역의 C열 중에서 링크가 있는 가장 위 행의 D열(육성도) 값을 쓴다.
+# (링크가 하나도 없으면 이름이 있는 행의 D열 값을 쓴다)
+# -------------------------------------------------
+
+def find_growth(start, b_values, c_values, d_values):
+
+    def cell(values, i):
+        return values[i][0] if i < len(values) and values[i] else ""
+
+    end = start + 1
+
+    while end < len(b_values) and not str(cell(b_values, end)).strip():
+        end += 1
+
+    for i in range(start, end):
+
+        if str(cell(c_values, i)).strip():
+            return cell(d_values, i)
+
+    return cell(d_values, start)
+
+
 credentials = Credentials.from_service_account_info(
     json.loads(os.environ["GOOGLE_CREDENTIALS"]),
     scopes=SCOPES
@@ -207,7 +235,9 @@ if len(character_list) == 0:
 
 
 # -------------------------------------------------
-# B/K/J/D 열 읽기 (D열 = 육성도, 어느 폼을 넣을지 정하는 데 쓴다)
+# B/C/K/J/D 열 읽기
+#  - D열 = 육성도, 어느 폼을 넣을지 정하는 데 쓴다
+#  - C열 = 링크, 캐릭터의 링크 영역에서 맨 위 링크 행을 찾는 데 쓴다
 # -------------------------------------------------
 
 start_row = 5
@@ -235,6 +265,10 @@ d_values = worksheet.get(
     f"D{start_row}:D{last_row}"
 )
 
+c_values = worksheet.get(
+    f"C{start_row}:C{last_row}"
+)
+
 # gspread가 뒷부분 빈 행은 아예 반환하지 않으므로 num_rows에 맞춰 채워준다
 while len(b_values) < num_rows:
     b_values.append([""])
@@ -247,6 +281,9 @@ while len(j_values) < num_rows:
 
 while len(d_values) < num_rows:
     d_values.append([""])
+
+while len(c_values) < num_rows:
+    c_values.append([""])
 
 # J열의 빈 행은 [](빈 리스트)로 오므로 [""]로 맞춰준다
 for i in range(num_rows):
@@ -272,7 +309,7 @@ for i in range(num_rows):
 
             if valid_b_count <= len(character_list):
 
-                d = d_values[i][0] if d_values[i] else ""
+                d = find_growth(i, b_values, c_values, d_values)
 
                 j_values[i][0] = pick_form(
                     character_list[valid_b_count - 1],
