@@ -1,157 +1,90 @@
-import requests
 import re
-import html as html_module
 import time
+
+import requests
+from bs4 import BeautifulSoup
+
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
 
 
 def extract_nickdate(url):
 
     total_start = time.time()
 
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-
     try:
-
-        # -------------------------
-        # HTTP 요청
-        # -------------------------
 
         request_start = time.time()
 
         response = requests.get(
             url,
-            headers=headers,
+            headers=HEADERS,
             timeout=30
         )
 
         request_time = time.time() - request_start
 
-        html = response.text
-
-        print(
-            f"[응답] 상태={response.status_code}, "
-            f"바이트={len(response.content)}, "
-            f"URL={url}",
-            flush=True
-        )
-
-        print(
-            f"[시간] HTTP 요청 : {request_time:.4f}초",
-            flush=True
-        )
-
         # 삭제된 글 판정
-        deleted = response.status_code == 404
-
-        if deleted:
+        if response.status_code == 404:
+            print(f"[삭제됨] {url}", flush=True)
             return {
                 "date": "삭제됨",
                 "author": "",
                 "deleted": True
             }
 
+        # 404 외의 오류(403, 429, 5xx 등)는 예외로 알려서 재시도 대상이 되게 한다
+        # (오류/차단 페이지를 그대로 파싱해서 엉뚱한 값을 뽑지 않도록)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # 글 머리(작성자/날짜) 영역만 대상으로 한다
+        # 페이지 전체에는 댓글 작성자의 data-nick도 많으므로,
+        # 이 영역을 못 찾았을 때 전체에서 찾으면 엉뚱한 사람이 잡힌다
+        head = soup.select_one("div.gallview_head")
+
+        if head is None:
+            raise ValueError(
+                "gallview_head 영역을 찾지 못했습니다 "
+                "(차단 페이지이거나 사이트 구조가 바뀜)"
+            )
+
         date = ""
         author = ""
 
         # -------------------------
-        # gallview_head 영역 추출
+        # 작성자
         # -------------------------
+        # data-uid(고정닉/아이디)가 있으면 그것을, 없으면 data-ip(유동)를 붙인다
 
-        head_start_time = time.time()
+        writer = head.select_one("[data-nick]")
 
-        head_part = html
+        if writer and writer.get("data-nick"):
 
-        head_start = html.find(
-            '<div class="gallview_head"'
-        )
+            nick = writer["data-nick"]
 
-        if head_start != -1:
+            uid = writer.get("data-uid") or writer.get("data-ip") or ""
 
-            head_end = html.find(
-                '<div class="gallview_contents"',
-                head_start
-            )
-
-            if head_end != -1:
-                head_part = html[
-                    head_start:head_end
-                ]
-            else:
-                head_part = html[
-                    head_start:
-                ]
-
-        head_time = time.time() - head_start_time
-
-        print(
-            f"[시간] 헤더 추출 : {head_time:.6f}초",
-            flush=True
-        )
+            author = f"{nick}({uid})" if uid else nick
 
         # -------------------------
-        # 작성자 추출
+        # 날짜
         # -------------------------
 
-        author_start_time = time.time()
+        date_tag = head.select_one("span.gall_date[title]")
 
-        author_match = re.search(
-            r'data-nick="([^"]+)"'
-            r'(?:\s+data-uid="([^"]*)")?'
-            r'(?:\s+data-ip="([^"]*)")?',
-            head_part
-        )
+        if date_tag:
+            raw_date = date_tag["title"]
+        else:
+            date_tag = head.select_one("span.date")
+            raw_date = date_tag.get_text() if date_tag else ""
 
-        if author_match:
+        if raw_date:
 
-            nick = html_module.unescape(
-                author_match.group(1)
-            )
-
-            uid = (
-                author_match.group(2)
-                if author_match.group(2)
-                else (author_match.group(3) or "")
-            )
-
-            if uid:
-                author = f"{nick}({uid})"
-            else:
-                author = nick
-
-        author_time = time.time() - author_start_time
-
-        print(
-            f"[시간] 작성자 추출 : {author_time:.6f}초",
-            flush=True
-        )
-
-        # -------------------------
-        # 날짜 추출
-        # -------------------------
-
-        date_start_time = time.time()
-
-        date_match = (
-            re.search(
-                r'<span class="gall_date" title="([^"]+)">',
-                head_part
-            )
-            or
-            re.search(
-                r'<span class="date">([^<]+)</span>',
-                head_part
-            )
-        )
-
-        if date_match:
-
-            raw_date = (
-                date_match.group(1)
-                .strip()
-                .split(" ")[0]
-            )
+            raw_date = raw_date.strip().split(" ")[0]
 
             date = re.sub(
                 r"\.([^ ])",
@@ -159,23 +92,11 @@ def extract_nickdate(url):
                 raw_date.replace("-", ". ")
             )
 
-        date_time = time.time() - date_start_time
-
+        # 한 글당 한 줄로 요약 (스레드 여러 개가 동시에 돌아도 URL로 구분된다)
         print(
-            f"[시간] 날짜 추출 : {date_time:.6f}초",
-            flush=True
-        )
-
-        total_time = time.time() - total_start
-
-        print(
-            f"[결과] 날짜={date}, "
-            f"작성자={author}",
-            flush=True
-        )
-
-        print(
-            f"[시간] 총 소요 : {total_time:.4f}초",
+            f"[결과] {url} : 날짜={date}, 작성자={author}, "
+            f"상태={response.status_code}, 바이트={len(response.content)} "
+            f"(요청 {request_time:.2f}초, 전체 {time.time() - total_start:.2f}초)",
             flush=True
         )
 
@@ -195,10 +116,7 @@ def extract_nickdate(url):
 
     except Exception as e:
 
-        print(
-            f"[오류] URL={url}, 오류={e}",
-            flush=True
-        )
+        print(f"[오류] {url} : {e}", flush=True)
 
         return {
             "date": "",
