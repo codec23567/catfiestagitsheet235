@@ -32,10 +32,18 @@ worksheet = spreadsheet.worksheet(
 # 1~4행은 헤더/설정용이라 실제 데이터는 5행부터 시작
 start_row = 5
 
-# C열(URL), F열(날짜), G열(작성자)
-urls = worksheet.col_values(3)
-dates = worksheet.col_values(6)
-authors = worksheet.col_values(7)
+# C열(URL), F열(날짜), G열(작성자)를 API 한 번(batch_get)으로 읽는다.
+# 행 번호 = 리스트 인덱스 + 1 이 되도록 1행부터 읽는다
+raw_columns = worksheet.batch_get(["C1:C", "F1:F", "G1:G"])
+
+
+def flatten(values):
+
+    # 중간의 빈 셀은 [](빈 리스트)로 오므로 ""로 바꿔 한 줄짜리 리스트로 만든다
+    return [row[0] if row else "" for row in values]
+
+
+urls, dates, authors = (flatten(values) for values in raw_columns)
 
 # gspread가 뒷부분 빈 셀은 반환하지 않으므로 urls 길이에 맞춰 채운다
 while len(dates) < len(urls):
@@ -44,7 +52,7 @@ while len(dates) < len(urls):
 while len(authors) < len(urls):
     authors.append("")
 
-requests = []
+target_urls = []
 target_rows = []
 
 for row in range(start_row, len(urls) + 1):
@@ -60,17 +68,20 @@ for row in range(start_row, len(urls) + 1):
     if "dcinside" not in url:
         continue
 
-    # 아직 크롤링 안 됨(날짜/작성자 비어있음) 또는 지난 실행에서 실패해 "retry"로 남은 경우
-    is_clear = (date == "") or (author == "")
-    is_retry = (date == "retry")
+    # 삭제된 글은 작성자가 빈 값이라 아래 조건에 걸리므로, 먼저 제외한다
+    # (안 그러면 삭제된 글을 실행할 때마다 다시 요청한다)
+    if date == "삭제됨":
+        continue
 
-    if is_clear or is_retry:
-        requests.append(url)
+    # 아직 크롤링 안 됨(날짜/작성자 비어있음) 또는 지난 실행에서 실패해 "retry"로 남은 경우
+    # ("retry" 행은 작성자가 항상 빈 값이라 이 조건에 함께 걸린다)
+    if date == "" or author == "":
+        target_urls.append(url)
         target_rows.append(row)
 
-print("크롤링 대상 개수 :", len(requests))
+print("크롤링 대상 개수 :", len(target_urls))
 
-for row, url in zip(target_rows, requests):
+for row, url in zip(target_rows, target_urls):
     print(row, url)
 
 # ---------------------------------------------
@@ -78,12 +89,13 @@ for row, url in zip(target_rows, requests):
 # ---------------------------------------------
 
 MAX_RETRIES = 3
+RETRY_WAIT_SECONDS = 5
 current_try = 0
 
-pending_requests = requests[:]
+pending_urls = target_urls[:]
 pending_rows = target_rows[:]
 
-while pending_requests and current_try < MAX_RETRIES:
+while pending_urls and current_try < MAX_RETRIES:
 
     print(f"\n===== {current_try + 1}차 시도 =====")
 
@@ -91,20 +103,20 @@ while pending_requests and current_try < MAX_RETRIES:
 
     # 동시 요청 부하를 줄이기 위해 worker 수를 낮게 유지
     with ThreadPoolExecutor(max_workers=4) as executor:
-        results = list(executor.map(extract_nickdate, pending_requests))
+        results = list(executor.map(extract_nickdate, pending_urls))
 
     batch_time = time.time() - batch_start
 
     print(
-        f"[전체] {len(pending_requests)}개 URL 병렬 처리 완료 : "
+        f"[전체] {len(pending_urls)}개 URL 병렬 처리 완료 : "
         f"{batch_time:.2f}초",
         flush=True
     )
 
-    next_pending_requests = []
+    next_pending_urls = []
     next_pending_rows = []
 
-    for row, url, result in zip(pending_rows, pending_requests, results):
+    for row, url, result in zip(pending_rows, pending_urls, results):
 
         if result["deleted"]:
             dates[row - 1] = "삭제됨"
@@ -118,13 +130,22 @@ while pending_requests and current_try < MAX_RETRIES:
 
         print(f"재시도 대상 : {url}")
 
-        next_pending_requests.append(url)
+        next_pending_urls.append(url)
         next_pending_rows.append(row)
 
-    pending_requests = next_pending_requests
+    pending_urls = next_pending_urls
     pending_rows = next_pending_rows
 
     current_try += 1
+
+    # 곧바로 다시 요청하면 차단/제한이 풀리지 않은 채 또 실패하므로 잠시 기다린다 (5초, 10초)
+    if pending_urls and current_try < MAX_RETRIES:
+
+        wait = RETRY_WAIT_SECONDS * 2 ** (current_try - 1)
+
+        print(f"{wait}초 뒤 재시도합니다", flush=True)
+
+        time.sleep(wait)
 
 # ---------------------------------------------
 # 3번 시도 후에도 실패하면 retry 기록
@@ -143,15 +164,23 @@ sheet_start = time.time()
 date_values = [[d] for d in dates[start_row - 1:]]
 author_values = [[a] for a in authors[start_row - 1:]]
 
-worksheet.update(
-    range_name=f"F{start_row}:F{start_row + len(date_values) - 1}",
-    values=date_values
-)
+# F열, G열을 API 한 번(batch_update)으로 쓴다 (update와 마찬가지로 값을 그대로 저장)
+updates = []
 
-worksheet.update(
-    range_name=f"G{start_row}:G{start_row + len(author_values) - 1}",
-    values=author_values
-)
+if date_values:
+    updates.append({
+        "range": f"F{start_row}:F{start_row + len(date_values) - 1}",
+        "values": date_values
+    })
+
+if author_values:
+    updates.append({
+        "range": f"G{start_row}:G{start_row + len(author_values) - 1}",
+        "values": author_values
+    })
+
+if updates:
+    worksheet.batch_update(updates)
 
 sheet_time = time.time() - sheet_start
 
