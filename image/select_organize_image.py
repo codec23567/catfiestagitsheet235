@@ -248,35 +248,41 @@ if len(character_list) == 0:
 
 
 # -------------------------------------------------
-# B/C/K/J/D 열 읽기
+# B/C/D/J/K 열 읽기
 #  - D열 = 육성도, 어느 폼을 넣을지 정하는 데 쓴다
 #  - C열 = 링크, 캐릭터의 링크 영역에서 맨 위 링크 행을 찾는 데 쓴다
 # -------------------------------------------------
 
 start_row = 5
 
-last_row = len(worksheet.col_values(2))
+COLUMNS = "BCDJK"
 
-if last_row < start_row:
-    last_row = start_row
+# 5개 열을 API 한 번(batch_get)으로 읽는다.
+# "B5:B" 처럼 끝 행을 정하지 않으면 각 열의 마지막 값이 있는 행까지만 돌아온다.
+raw_columns = worksheet.batch_get(
+    [f"{col}{start_row}:{col}" for col in COLUMNS]
+)
+
+# 마지막 행 = B열(이름)의 마지막 값이 있는 행
+last_row = max(start_row, start_row + len(raw_columns[0]) - 1)
 
 num_rows = last_row - start_row + 1
 
-def read_column(col):
 
-    values = worksheet.get(
-        f"{col}{start_row}:{col}{last_row}"
-    )
+def normalize(values):
+
+    # B열 기준 num_rows까지만 사용한다 (다른 열이 더 길어도 무시)
+    values = list(values)[:num_rows]
 
     # gspread가 뒷부분 빈 행은 아예 반환하지 않으므로 num_rows에 맞춰 채워준다
     values += [[""] for _ in range(num_rows - len(values))]
 
     # 중간의 빈 행은 [](빈 리스트)로 오므로 [""]로 맞춰준다
-    return [row if row else [""] for row in values]
+    return [list(row) if row else [""] for row in values]
 
 
 b_values, c_values, d_values, j_values, k_values = (
-    read_column(col) for col in "BCDJK"
+    normalize(values) for values in raw_columns
 )
 
 # -------------------------------------------------
