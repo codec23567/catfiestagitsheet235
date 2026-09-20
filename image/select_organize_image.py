@@ -7,7 +7,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from regex_test import extract_images
+from image_test import extract_images
 
 
 SCOPES = [
@@ -151,7 +151,7 @@ for url in target_urls:
 # -------------------------------------------------
 #  1) 개별 URL이 실패해도 전체를 즉시 중단하지 않고,
 #     실패한 URL만 다음 라운드에서 재시도한다 (최대 3회).
-#  2) "삭제된 글"(regex_test.py가 deleted=True로 알려줌)은
+#  2) "삭제된 글"(image_test.py가 deleted=True로 알려줌)은
 #     재시도해도 의미가 없으므로 즉시 "이미지 0개"로 확정하고
 #     재시도 대상에서 제외한다.
 #  3) 재시도를 다 써도 여전히 실패하는 URL이 남으면,
