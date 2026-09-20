@@ -262,46 +262,22 @@ if last_row < start_row:
 
 num_rows = last_row - start_row + 1
 
-b_values = worksheet.get(
-    f"B{start_row}:B{last_row}"
+def read_column(col):
+
+    values = worksheet.get(
+        f"{col}{start_row}:{col}{last_row}"
+    )
+
+    # gspread가 뒷부분 빈 행은 아예 반환하지 않으므로 num_rows에 맞춰 채워준다
+    values += [[""] for _ in range(num_rows - len(values))]
+
+    # 중간의 빈 행은 [](빈 리스트)로 오므로 [""]로 맞춰준다
+    return [row if row else [""] for row in values]
+
+
+b_values, c_values, d_values, j_values, k_values = (
+    read_column(col) for col in "BCDJK"
 )
-
-k_values = worksheet.get(
-    f"K{start_row}:K{last_row}"
-)
-
-j_values = worksheet.get(
-    f"J{start_row}:J{last_row}"
-)
-
-d_values = worksheet.get(
-    f"D{start_row}:D{last_row}"
-)
-
-c_values = worksheet.get(
-    f"C{start_row}:C{last_row}"
-)
-
-# gspread가 뒷부분 빈 행은 아예 반환하지 않으므로 num_rows에 맞춰 채워준다
-while len(b_values) < num_rows:
-    b_values.append([""])
-
-while len(k_values) < num_rows:
-    k_values.append([""])
-
-while len(j_values) < num_rows:
-    j_values.append([""])
-
-while len(d_values) < num_rows:
-    d_values.append([""])
-
-while len(c_values) < num_rows:
-    c_values.append([""])
-
-# J열의 빈 행은 [](빈 리스트)로 오므로 [""]로 맞춰준다
-for i in range(num_rows):
-    if len(j_values[i]) == 0:
-        j_values[i] = [""]
 
 # -------------------------------------------------
 # B열 기준으로 유효 행을 세면서 이미지 매칭
